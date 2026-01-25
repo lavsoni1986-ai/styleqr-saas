@@ -1,0 +1,65 @@
+# Percy Configuration for StyleQR SaaS Platform
+# Visual regression testing configuration
+
+version: 2
+
+# Snapshot settings
+snapshot:
+  # Widths to test (mobile, tablet, desktop)
+  widths: [375, 768, 1280, 1920]
+  
+  # Minimum height for snapshots
+  minHeight: 600
+  
+  # Percy-specific settings
+  percy-css: |
+    /* Hide dynamic content that changes between runs */
+    .animate-pulse,
+    [data-testid="loading"],
+    .skeleton {
+      visibility: hidden !important;
+    }
+    
+    /* Hide timestamps and dynamic IDs */
+    [data-timestamp],
+    [data-dynamic-id] {
+      display: none !important;
+    }
+
+# Build settings
+build:
+  # Environment variables
+  env:
+    PERCY_BRANCH: ${PERCY_BRANCH:-main}
+    PERCY_PROJECT: styleqr-saas
+  
+  # Parallel builds
+  parallel:
+    total: 1
+    nonce: ${PERCY_PARALLEL_NONCE:-}
+
+# Discovery settings
+discovery:
+  # Network idle timeout
+  networkIdleTimeout: 750
+  
+  # Allowed hostnames
+  allowedHostnames:
+    - localhost
+    - 127.0.0.1
+  
+  # Disallowed hostnames (external resources)
+  disallowedHostnames:
+    - google-analytics.com
+    - googletagmanager.com
+    - facebook.com
+    - twitter.com
+
+# CI/CD settings
+ci:
+  # GitHub Actions support
+  github:
+    repository: ${GITHUB_REPOSITORY}
+    commit: ${GITHUB_SHA}
+    branch: ${GITHUB_REF_NAME}
+    pullRequest: ${GITHUB_PR_NUMBER}

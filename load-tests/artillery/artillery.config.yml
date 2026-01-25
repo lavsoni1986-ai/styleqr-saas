@@ -1,0 +1,82 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    - duration: 120
+      arrivalRate: 100
+      name: "Peak load"
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool down"
+  processor: "./processor.js"
+  plugins:
+    expect: {}
+    metrics-by-endpoint:
+      stripQueryString: true
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  variables:
+    restaurantId: "{{ $randomString() }}"
+    authToken: ""
+
+scenarios:
+  - name: "Restaurant API Load Test"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/restaurants"
+          headers:
+            Cookie: "next-auth.session-token={{ authToken }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      - think: 1
+      - post:
+          url: "/api/restaurants"
+          json:
+            name: "Test Restaurant {{ $randomString() }}"
+          headers:
+            Cookie: "next-auth.session-token={{ authToken }}"
+          expect:
+            - statusCode: [201, 409]
+
+  - name: "Menu API Load Test"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/menus/categories?restaurantId={{ restaurantId }}"
+          headers:
+            Cookie: "next-auth.session-token={{ authToken }}"
+          expect:
+            - statusCode: 200
+      - think: 0.5
+      - get:
+          url: "/api/menus/items?restaurantId={{ restaurantId }}"
+          headers:
+            Cookie: "next-auth.session-token={{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  - name: "Orders API Load Test"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/orders/v2"
+          json:
+            restaurantId: "{{ restaurantId }}"
+            type: "DINE_IN"
+            items:
+              - menuItemId: "{{ $randomString() }}"
+                quantity: 2
+            idempotencyKey: "{{ $uuid() }}"
+          headers:
+            Cookie: "next-auth.session-token={{ authToken }}"
+          expect:
+            - statusCode: [201, 200]
+

@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "styleqr-session",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNta2o3bThnZjAwMDB1dWZzc25iZzYxYTUiLCJlbWFpbCI6Im93bmVyQHRlc3QuY29tIiwibmFtZSI6IlRlc3QgT3duZXIiLCJyb2xlIjoiUkVTVEFVUkFOVF9PV05FUiIsImlhdCI6MTc2ODc1NzE3NiwiZXhwIjoxNzY5MzYxOTc2fQ.y0dHk-4XE28dzs7y_feGE5SeFUTx-sRlTQZdQ1VIelg",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}
