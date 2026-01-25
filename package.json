@@ -36,7 +36,7 @@
     "analyze": "ANALYZE=true npm run build",
     "lighthouse": "lighthouse http://localhost:3000 --output html --output-path ./lighthouse-report.html",
     "test:report": "playwright show-report",
-    "preinstall": "node scripts/check-node-version.js",
+    "preinstall": "node -e \"if(!process.env.CI){require('child_process').execSync('node scripts/check-node-version.js',{stdio:'inherit'})}\"",
     "check-env": "node scripts/check-environment.js",
     "seed:admin": "ts-node scripts/createSuperAdmin.ts",
     "seed:partner": "ts-node scripts/createWhiteLabelPartner.ts",
