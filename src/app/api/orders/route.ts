@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
               spaceType: context.spaceType!,
               identifier: context.identifier!,
               timeSlot: finalTimeSlot || "",
-              serviceMode: context.serviceMode || null,
+              serviceMode: context.serviceMode || "",
             },
           },
           update: {},
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
             spaceType: context.spaceType!,
             identifier: context.identifier!,
             timeSlot: finalTimeSlot || "",
-            serviceMode: context.serviceMode || null,
+            serviceMode: context.serviceMode || "",
           },
         });
         contextNodeId = contextNode.id;
