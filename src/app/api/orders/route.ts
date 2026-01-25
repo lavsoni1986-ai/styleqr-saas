@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
               entityType: context.entityType!,
               spaceType: context.spaceType!,
               identifier: context.identifier!,
-              timeSlot: finalTimeSlot,
+              timeSlot: finalTimeSlot || "",
               serviceMode: context.serviceMode || null,
             },
           },
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
             entityType: context.entityType!,
             spaceType: context.spaceType!,
             identifier: context.identifier!,
-            timeSlot: finalTimeSlot,
+            timeSlot: finalTimeSlot || "",
             serviceMode: context.serviceMode || null,
           },
         });
