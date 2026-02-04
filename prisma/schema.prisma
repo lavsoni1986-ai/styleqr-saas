@@ -3,11 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
 
 model User {
   id            String       @id @default(uuid())
@@ -135,4 +133,508 @@ model Restaurant {
   @@index([partnerId])
   @@index([districtId])
   @@index([subscriptionId])
+}
+
+model Category {
+  id           String     @id @default(uuid())
+  name         String
+  restaurantId String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items        MenuItem[]
+
+  @@index([restaurantId])
+}
+
+model MenuItem {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  image       String?
+  available   Boolean     @default(true)
+  categoryId  String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  billItems   BillItem[]
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+
+  @@index([categoryId])
+}
+
+model Table {
+  id           String     @id @default(uuid())
+  restaurantId String
+  name         String?
+  qrToken      String     @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  bills        Bill[]
+  orders       Order[]
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+}
+
+// ContextNode: Context-aware ordering layer for hotel/restaurant scenarios
+// Represents physical + situational context (room, table, zone, time, service mode)
+// Automatically inferred via QR - users never type room/table numbers
+model ContextNode {
+  id          String   @id @default(uuid())
+  entityType  String // "hotel" | "restaurant"
+  spaceType   String // "room" | "table" | "zone"
+  identifier  String // e.g. "205", "T3", "Zone-A"
+  timeSlot    String? // Optional: "breakfast" | "lunch" | "dinner"
+  serviceMode String? // Optional: "in-room" | "dine-in" | "takeaway"
+  createdAt   DateTime @default(now())
+  orders      Order[]
+
+  @@unique([entityType, spaceType, identifier, timeSlot, serviceMode])
+  @@index([entityType, spaceType, identifier])
+}
+
+model Order {
+  id            String          @id @default(uuid())
+  restaurantId  String
+  tableId       String?
+  contextNodeId String? // Optional: Context-aware ordering (hotel rooms, zones, etc.)
+  status        OrderStatus     @default(PENDING)
+  type          OrderType
+  total         Float           @default(0)
+  isPriority    Boolean         @default(false)
+  commissionId  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  commission    Commission?     @relation("OrderCommission")
+  restaurant    Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table         Table?          @relation(fields: [tableId], references: [id])
+  contextNode   ContextNode?    @relation(fields: [contextNodeId], references: [id], onDelete: SetNull)
+  auditLogs     OrderAuditLog[]
+  items         OrderItem[]
+  notes         OrderNote[]
+
+  @@index([restaurantId])
+  @@index([tableId])
+  @@index([contextNodeId])
+  @@index([commissionId])
+  @@index([isPriority])
+  @@index([status])
+  // Performance: Composite index for common kitchen query pattern (restaurantId + status + createdAt)
+  @@index([restaurantId, status, createdAt])
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  menuItemId String
+  quantity   Int      @default(1)
+  price      Float
+  createdAt  DateTime @default(now())
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+model OrderNote {
+  id        String   @id @default(uuid())
+  orderId   String
+  content   String
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model OrderAuditLog {
+  id        String   @id @default(uuid())
+  orderId   String
+  action    String
+  details   String?
+  userId    String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Subscription {
+  id           String             @id @default(uuid())
+  restaurantId String?            @unique
+  partnerId    String?
+  plan         SubscriptionPlan   @default(BASIC)
+  status       SubscriptionStatus @default(TRIAL)
+  monthlyPrice Float              @default(0)
+  startDate    DateTime           @default(now())
+  endDate      DateTime?
+  trialEndDate DateTime?
+  autoRenew    Boolean            @default(true)
+  features     String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  partner      Partner?           @relation(fields: [partnerId], references: [id])
+  restaurant   Restaurant?        @relation("RestaurantSubscription", fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([partnerId])
+  @@index([status])
+}
+
+model Commission {
+  id           String           @id @default(uuid())
+  partnerId    String
+  orderId      String?          @unique
+  restaurantId String?
+  userId       String?
+  amount       Float            @default(0)
+  rate         Float            @default(0)
+  baseAmount   Float            @default(0)
+  status       CommissionStatus @default(PENDING)
+  paymentDate  DateTime?
+  periodStart  DateTime?
+  periodEnd    DateTime?
+  description  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  order        Order?           @relation("OrderCommission", fields: [orderId], references: [id])
+  partner      Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant?      @relation(fields: [restaurantId], references: [id])
+  user         User?            @relation(fields: [userId], references: [id])
+
+  @@index([partnerId])
+  @@index([orderId])
+  @@index([restaurantId])
+  @@index([status])
+  @@index([paymentDate])
+}
+
+model Bill {
+  id            String     @id @default(uuid())
+  billNumber    String     @unique
+  restaurantId  String
+  tableId       String?
+  shiftId       String?
+  status        BillStatus @default(OPEN)
+  subtotal      Float      @default(0)
+  taxRate       Float      @default(0)
+  cgst          Float      @default(0)
+  sgst          Float      @default(0)
+  discount      Float      @default(0)
+  serviceCharge Float      @default(0)
+  total         Float      @default(0)
+  paidAmount    Float      @default(0)
+  balance       Float      @default(0)
+  parentBillId  String?
+  customerName  String?
+  customerPhone String?
+  invoiceData   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  closedAt      DateTime?
+  parentBill    Bill?      @relation("SplitBills", fields: [parentBillId], references: [id])
+  splitBills    Bill[]     @relation("SplitBills")
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  shift         Shift?     @relation(fields: [shiftId], references: [id])
+  table         Table?     @relation(fields: [tableId], references: [id])
+  items         BillItem[]
+  payments      Payment[]
+  tips          Tip[]
+
+  @@index([restaurantId])
+  @@index([tableId])
+  @@index([shiftId])
+  @@index([status])
+  @@index([billNumber])
+  @@index([createdAt])
+  @@index([parentBillId])
+}
+
+model BillItem {
+  id         String    @id @default(uuid())
+  billId     String
+  menuItemId String?
+  name       String
+  quantity   Int       @default(1)
+  price      Float
+  taxRate    Float     @default(0)
+  cgst       Float     @default(0)
+  sgst       Float     @default(0)
+  discount   Float     @default(0)
+  total      Float
+  createdAt  DateTime  @default(now())
+  bill       Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id])
+
+  @@index([billId])
+  @@index([menuItemId])
+}
+
+model Payment {
+  id               String          @id @default(uuid())
+  billId           String
+  method           PaymentMethod
+  amount           Float
+  reference        String?
+  notes            String?
+  shiftId          String?
+  status           PaymentStatus   @default(PENDING)
+  gatewayId        String?
+  gatewayPaymentId String?
+  gatewayResponse  String?
+  clientSecret     String?
+  paymentLink      String?
+  settlementId     String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  succeededAt      DateTime?
+  failedAt         DateTime?
+  bill             Bill            @relation(fields: [billId], references: [id], onDelete: Cascade)
+  gateway          PaymentGateway? @relation(fields: [gatewayId], references: [id])
+  settlement       Settlement?     @relation(fields: [settlementId], references: [id])
+  shift            Shift?          @relation(fields: [shiftId], references: [id])
+  refunds          Refund[]
+  tip              Tip?
+
+  @@index([billId])
+  @@index([method])
+  @@index([shiftId])
+  @@index([status])
+  @@index([gatewayId])
+  @@index([gatewayPaymentId])
+  @@index([settlementId])
+  @@index([createdAt])
+}
+
+model PaymentGateway {
+  id            String     @id @default(uuid())
+  restaurantId  String
+  name          String
+  country       String     @default("IN")
+  isActive      Boolean    @default(true)
+  isDefault     Boolean    @default(false)
+  keyId         String?
+  keySecret     String?
+  webhookSecret String?
+  config        String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  payments      Payment[]
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([name])
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+model Settlement {
+  id                  String           @id @default(uuid())
+  restaurantId        String
+  date                DateTime
+  status              SettlementStatus @default(PENDING)
+  totalSales          Float            @default(0)
+  cash                Float            @default(0)
+  upi                 Float            @default(0)
+  card                Float            @default(0)
+  wallet              Float            @default(0)
+  qr                  Float            @default(0)
+  netbanking          Float            @default(0)
+  refunds             Float            @default(0)
+  tips                Float            @default(0)
+  discounts           Float            @default(0)
+  gatewayId           String?
+  gatewayAmount       Float            @default(0)
+  gatewayFees         Float            @default(0)
+  gatewaySettlementId String?
+  variance            Float            @default(0)
+  varianceNotes       String?
+  transactionCount    Int              @default(0)
+  processedAt         DateTime?
+  reconciledAt        DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  payments            Payment[]
+  refundTransactions  Refund[]         @relation("SettlementRefunds")
+  restaurant          Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, date])
+  @@index([restaurantId])
+  @@index([date])
+  @@index([status])
+  @@index([gatewayId])
+}
+
+model Tip {
+  id         String   @id @default(uuid())
+  billId     String
+  paymentId  String   @unique
+  amount     Float
+  percentage Float?
+  staffId    String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  bill       Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  payment    Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  staff      User?    @relation(fields: [staffId], references: [id])
+
+  @@index([billId])
+  @@index([paymentId])
+  @@index([staffId])
+  @@index([createdAt])
+}
+
+model Refund {
+  id              String       @id @default(uuid())
+  paymentId       String
+  amount          Float
+  status          RefundStatus @default(PENDING)
+  reason          String?
+  gatewayRefundId String?
+  gatewayResponse String?
+  settlementId    String?
+  requestedBy     String?
+  approvedBy      String?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  processedAt     DateTime?
+  succeededAt     DateTime?
+  failedAt        DateTime?
+  payment         Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  settlement      Settlement?  @relation("SettlementRefunds", fields: [settlementId], references: [id])
+
+  @@index([paymentId])
+  @@index([status])
+  @@index([settlementId])
+  @@index([createdAt])
+}
+
+model Shift {
+  id             String      @id @default(uuid())
+  restaurantId   String
+  userId         String
+  status         ShiftStatus @default(OPEN)
+  openingCash    Float       @default(0)
+  expectedCash   Float       @default(0)
+  actualCash     Float?
+  cashDifference Float?
+  openedAt       DateTime    @default(now())
+  closedAt       DateTime?
+  notes          String?
+  bills          Bill[]
+  payments       Payment[]
+  restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([status])
+  @@index([openedAt])
+}
+
+model BillSequence {
+  id             String     @id @default(uuid())
+  restaurantId   String     @unique
+  lastBillNumber Int        @default(0)
+  year           Int
+  updatedAt      DateTime   @updatedAt
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([year])
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  SERVED
+  CANCELLED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum Role {
+  SUPER_ADMIN
+  WHITE_LABEL_ADMIN
+  DISTRICT_ADMIN
+  PARTNER
+  RESTAURANT_OWNER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum CommissionStatus {
+  PENDING
+  CALCULATED
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  QR
+  WALLET
+  NETBANKING
+  EMI
+  CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum SettlementStatus {
+  PENDING
+  PROCESSED
+  RECONCILED
+  DISPUTED
+}
+
+enum BillStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
 }
