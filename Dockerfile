@@ -1,41 +1,35 @@
-# ===============================
-# StyleQR SaaS – Railway Dockerfile
-# ===============================
-
+# Stage 1: Builder
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Install deps
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source
 COPY . .
 
-# Prisma generate (needs DATABASE_URL from Railway)
+# Generate Prisma (does NOT need DB)
 RUN npx prisma generate
 
-# Build Next.js
+# 🔥 Skip env validation during build
+ENV SKIP_ENV_VALIDATION=true
+
 RUN npm run build
 
-# ===============================
-# Runtime
-# ===============================
+# Stage 2: Runner
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
 
-# Copy standalone output (Next.js)
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
 
-# Prisma runtime files
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+USER nextjs
 
 EXPOSE 3000
 
