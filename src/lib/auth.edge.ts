@@ -11,6 +11,16 @@
 import * as jwt from "jsonwebtoken";
 
 function getJwtSecret(): string {
+  // Skip validation during build (Railway compatibility)
+  if (process.env.SKIP_ENV_VALIDATION === "true") {
+    const s = process.env.JWT_SECRET || "";
+    if (!s || s.trim() === "") {
+      console.warn("[ENV] Skipping JWT_SECRET validation (SKIP_ENV_VALIDATION=true)");
+      return ""; // Return empty string during build
+    }
+    return s;
+  }
+
   const s = process.env.JWT_SECRET;
   if (!s || typeof s !== "string" || s.trim() === "") {
     throw new Error("JWT_SECRET is required and must be non-empty. Set JWT_SECRET in .env.");

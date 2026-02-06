@@ -47,8 +47,9 @@ const districtApiRoutes = ["/api/district"];
 const partnerApiRoutes = ["/api/partner"];
 
 export function proxy(request: NextRequest) {
-  // Ensure NEXTAUTH_SECRET is set (runtime check)
-  if (!process.env.NEXTAUTH_SECRET) {
+  // Ensure NEXTAUTH_SECRET is set (runtime check only, skip during build)
+  // This is a runtime check, so it should only run when handling actual requests
+  if (process.env.SKIP_ENV_VALIDATION !== "true" && !process.env.NEXTAUTH_SECRET) {
     console.error("❌ NEXTAUTH_SECRET is required. Set it in .env file.");
     return NextResponse.json(
       { error: "Server configuration error: NEXTAUTH_SECRET is missing" },

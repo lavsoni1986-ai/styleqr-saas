@@ -22,8 +22,14 @@ const createPrismaClient = () => {
   const isDevelopment = process.env.NODE_ENV === "development";
   
   // Validate DATABASE_URL is set (will throw if missing in production)
-  getEnv("DATABASE_URL");
+  // During build with SKIP_ENV_VALIDATION, this returns empty string and doesn't throw
+  // Prisma will read DATABASE_URL from process.env directly, so validation here is just a check
+  if (process.env.SKIP_ENV_VALIDATION !== "true") {
+    getEnv("DATABASE_URL");
+  }
   
+  // PrismaClient reads DATABASE_URL from process.env automatically
+  // No need to pass it explicitly in constructor
   return new PrismaClient({
     log: isDevelopment
       ? [
