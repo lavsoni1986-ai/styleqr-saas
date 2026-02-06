@@ -24,11 +24,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 🔥 THIS WAS MISSING
-COPY --from=builder /app/node_modules ./node_modules
-
+# Copy Next.js standalone output (includes minimal node_modules)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Copy Prisma runtime files (standalone doesn't include generated Prisma Client)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
