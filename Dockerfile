@@ -6,22 +6,26 @@ RUN npm ci
 
 COPY . .
 
-# ---- TEMP BUILD ENVS (only for build time) ----
+# ---- TEMP BUILD ENVS ----
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV NEXTAUTH_SECRET="build-secret"
 ENV JWT_SECRET="build-secret"
 ENV NEXTAUTH_URL="http://localhost:3000"
-# Skip environment validation during build (Railway compatibility)
 ENV SKIP_ENV_VALIDATION="true"
 
 RUN npx prisma generate
 RUN npm run build
+
+# ================= RUNNER =================
 
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# 🔥 THIS WAS MISSING
+COPY --from=builder /app/node_modules ./node_modules
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
