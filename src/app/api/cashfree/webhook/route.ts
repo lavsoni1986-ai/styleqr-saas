@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { Cashfree } from "@/lib/cashfree";
+import { verifyWebhookSignature } from "@/lib/cashfree";
 import { prisma } from "@/lib/prisma.server";
 import { createAuditLog } from "@/lib/audit-log";
 import { calculateAndStoreRevenueShare } from "@/lib/revenue-share";
@@ -43,8 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Cashfree SDK uses XClientSecret for HMAC verification
-    Cashfree.PGVerifyWebhookSignature(signature, body, timestamp ?? "");
+    verifyWebhookSignature(signature, body, timestamp ?? "");
   } catch (error) {
     webhookLogger.error("Webhook signature verification failed", {}, error instanceof Error ? error : undefined);
     triggerFinancialAlert({

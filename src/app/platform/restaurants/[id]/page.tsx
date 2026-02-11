@@ -45,7 +45,7 @@ export default async function PlatformRestaurantDetailPage({
       subscription: {
         select: {
           status: true,
-          currentPeriodEnd: true,
+          endDate: true,
         },
       },
       _count: {

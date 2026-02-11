@@ -27,7 +27,7 @@ interface Restaurant {
   } | null;
   subscription: {
     status: string;
-    currentPeriodEnd: Date | null;
+    endDate: Date | null;
   } | null;
   _count: {
     categories: number;

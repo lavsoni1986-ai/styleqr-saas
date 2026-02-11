@@ -38,7 +38,7 @@ export default function ContactPage() {
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 shrink-0 mt-0.5" style={{ color: tokens.colors.accent }} />
               <p className="text-sm leading-relaxed" style={{ color: tokens.colors.textSecondary }}>
-                Housing Board Colony, Shahdol, Madhya Pradesh, 484001
+                Housing Board Colony, Shahdol, MP 484001
               </p>
             </div>
             <div className="flex items-center gap-3">

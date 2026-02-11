@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { Cashfree } from "@/lib/cashfree";
+import { verifyWebhookSignature } from "@/lib/cashfree";
 import { prisma } from "@/lib/prisma.server";
 import { handleApiError } from "@/lib/api-error-handler";
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    Cashfree.PGVerifyWebhookSignature(signature, body, timestamp ?? "");
+    verifyWebhookSignature(signature, body, timestamp ?? "");
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }

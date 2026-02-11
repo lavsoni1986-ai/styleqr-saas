@@ -1,5 +1,6 @@
 import "server-only";
-import { Cashfree } from "cashfree-pg";
+import crypto from "crypto";
+import { Cashfree, CFEnvironment } from "cashfree-pg";
 
 /**
  * Cashfree PG Server Utility
@@ -29,15 +30,34 @@ if (!appId || !secretKey) {
 // TEST or sandbox = Sandbox, otherwise Production
 const isSandbox =
   process.env.CASHFREE_ENV === "sandbox" || process.env.CASHFREE_ENV === "TEST";
-const environment = isSandbox ? Cashfree.Environment.SANDBOX : Cashfree.Environment.PRODUCTION;
+const environment = isSandbox ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION;
 
-Cashfree.XClientId = appId;
-Cashfree.XClientSecret = secretKey;
-Cashfree.XEnvironment = environment;
+const cashfreeInstance = new Cashfree(environment, appId, secretKey);
 
-export { Cashfree };
+export { Cashfree, cashfreeInstance };
 export const cashfreeAppId = appId;
 export const cashfreeSecretKey = secretKey;
+
+/**
+ * Verify Cashfree webhook signature (HMAC-SHA256).
+ * Uses raw body as required by Cashfree.
+ * @see https://docs.cashfree.com/docs/payments/online/webhooks/signature-verification
+ */
+export function verifyWebhookSignature(
+  signature: string,
+  rawBody: string,
+  timestamp: string
+): void {
+  const body = timestamp + rawBody;
+  const key = secretKey as string; // guarded at module load
+  const generatedSignature = crypto
+    .createHmac("sha256", key)
+    .update(body)
+    .digest("base64");
+  if (generatedSignature !== signature) {
+    throw new Error("Generated signature and received signature did not match.");
+  }
+}
 
 /**
  * Get plan amount in INR for district subscription

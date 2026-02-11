@@ -19,11 +19,16 @@ import { logger, createRequestLogger } from "@/lib/logger";
  * - Request tracing via X-Request-ID
  */
 
-// Public routes that don't require authentication
+// Public routes that don't require authentication (Cashfree review: /contact, /terms-and-conditions, /refund-policy)
 const publicRoutes = [
   "/",
   "/menu",
   "/order",
+  "/contact",
+  "/terms-and-conditions",
+  "/refund-policy",
+  "/privacy-policy",
+  "/shipping-policy",
   "/api/qr",
   "/api/orders",
   "/api/menu",
