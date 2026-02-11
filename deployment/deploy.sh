@@ -28,7 +28,7 @@ npx prisma generate
 
 # Run database migrations
 echo "🗄️  Running database migrations..."
-npx prisma migrate deploy
+node ./node_modules/prisma/build/index.js migrate deploy
 
 # Build Next.js application
 echo "🏗️  Building Next.js application..."

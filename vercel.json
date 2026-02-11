@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx prisma migrate deploy && npm run build",
+  "buildCommand": "node ./node_modules/prisma/build/index.js migrate deploy && npm run build",
   "installCommand": "npm install",
   "framework": "nextjs"
 }

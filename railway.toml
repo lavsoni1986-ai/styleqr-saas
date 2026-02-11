@@ -2,4 +2,4 @@
 builder = "DOCKERFILE"
 
 [deploy]
-startCommand = "npx prisma migrate deploy && node server.js"
+startCommand = "node node_modules/prisma/build/index.js migrate deploy && node server.js"

@@ -30,27 +30,25 @@ ENV HOSTNAME=0.0.0.0
 ENV SKIP_ENV_VALIDATION=""
 
 # Copy Next.js standalone output (includes minimal node_modules)
-# Copy entire standalone directory first, then backup server.js before overwriting
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
 # Backup the generated server.js before we overwrite it with our wrapper
 RUN cp server.js server.original.js
 
-# Copy Prisma runtime files (standalone doesn't include generated Prisma Client)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Temporary fix: Copy full node_modules to resolve Prisma v6 CLI deps (effect, @prisma/config, etc.)
+# Overwrites standalone's minimal node_modules to ensure migrations work
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy custom server.js wrapper (overrides generated server.js)
 COPY server.js ./server.js
 
 # Copy Prisma schema and migrations for runtime migrate deploy
 COPY prisma ./prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 RUN mkdir -p public
 
 EXPOSE 8080
 
 # Run migrations on startup, then start server (migrate deploy is idempotent)
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]

@@ -37,7 +37,7 @@ try {
 
   if (hasMigrations) {
     console.log("🔄 Running migrations...");
-    execSync("npx prisma migrate deploy", { stdio: "inherit" });
+    execSync("node ./node_modules/prisma/build/index.js migrate deploy", { stdio: "inherit" });
     console.log("✅ Migrations applied\n");
   } else {
     console.log("🆕 Creating initial migration...");
