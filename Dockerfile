@@ -46,9 +46,12 @@ COPY server.js ./server.js
 # Copy Prisma schema and migrations for runtime migrate deploy
 COPY prisma ./prisma
 
+# Copy rollback script
+COPY scripts ./scripts
+
 RUN mkdir -p public
 
 EXPOSE 8080
 
 # Run migrations on startup, then start server (migrate deploy is idempotent)
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260211072206_add_context_node_id"]
+CMD ["node", "scripts/rollback.js"]

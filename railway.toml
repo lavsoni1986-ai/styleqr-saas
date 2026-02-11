@@ -2,4 +2,4 @@
 builder = "DOCKERFILE"
 
 [deploy]
-startCommand = "node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260211072206_add_context_node_id"
+startCommand = "node scripts/rollback.js"
