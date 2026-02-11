@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Plus, Utensils, Image as ImageIcon, Loader2, AlertCircle, RefreshCcw, X, Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { uploadToCloudinary } from "@/lib/cloudinary";
+import { uploadToCloudinary, getCloudinaryThumbnail } from "@/lib/cloudinary";
 import EditProductModal from "./EditProductModal";
 import { Modal } from "@/components/ui/Modal";
 
@@ -24,6 +24,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   // Form states
   const [categoryName, setCategoryName] = useState("");
@@ -248,14 +249,15 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
                     <div key={item.id} className="card-glass p-4 hover:bg-white/[0.07] transition-all group relative">
                       <div className="flex gap-4">
                         <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-white/5 flex-shrink-0 border border-white/10">
-                          {item.image ? (
+                          {item.image && !imageErrors.has(item.id) ? (
                             <Image
-                              src={item.image}
-                              alt={item.name}
+                              src={getCloudinaryThumbnail(item.image, { width: 160, height: 160 })}
+                              alt={item.name || "Menu item"}
                               fill
                               className="object-cover group-hover:scale-110 transition-transform duration-300"
                               sizes="80px"
                               loading="lazy"
+                              onError={() => setImageErrors((prev) => new Set(prev).add(item.id))}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -334,7 +336,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
               type="text"
               value={categoryName}
               onChange={(e) => setCategoryName(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+              className="input-dark w-full px-3 py-2"
               placeholder="e.g., Appetizers, Main Course"
               required
             />
@@ -378,7 +380,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
               type="text"
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+              className="input-dark w-full px-3 py-2"
               required
             />
           </div>
@@ -388,7 +390,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
             <select
               value={productCategory}
               onChange={(e) => setProductCategory(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+              className="input-dark w-full px-3 py-2"
               required
             >
               <option value="">Select a category</option>
@@ -408,7 +410,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
               min="0"
               value={productPrice}
               onChange={(e) => setProductPrice(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+              className="input-dark w-full px-3 py-2"
               required
             />
           </div>
@@ -419,7 +421,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+              className="input-dark w-full px-3 py-2"
             />
           </div>
 
@@ -436,8 +438,8 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
             {imageUrl && (
               <div className="mt-2 relative w-32 h-32 rounded-xl border border-white/10 overflow-hidden">
                 <Image
-                  src={imageUrl}
-                  alt="Preview"
+                  src={getCloudinaryThumbnail(imageUrl, { width: 256, height: 256 })}
+                  alt="Product preview"
                   fill
                   className="object-cover"
                   sizes="128px"

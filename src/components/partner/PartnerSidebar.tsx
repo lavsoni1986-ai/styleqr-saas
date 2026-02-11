@@ -58,7 +58,14 @@ export default function PartnerSidebar() {
   return (
     <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full">
       <div className="p-6 border-b border-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900">Partner</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900">Partner</h1>
+          {process.env.NEXT_PUBLIC_BETA_MODE === "true" && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 font-medium">
+              Beta
+            </span>
+          )}
+        </div>
         <p className="text-sm text-slate-500 mt-1">Partner Dashboard</p>
       </div>
 

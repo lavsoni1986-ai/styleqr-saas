@@ -22,7 +22,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   // Image optimization
+  // Set NEXT_IMAGE_UNOPTIMIZED=true in production to bypass proxy and fix 504 Gateway Timeout
+  // when Cloudinary images timeout during Next.js image optimization.
   images: {
+    unoptimized: process.env.NEXT_IMAGE_UNOPTIMIZED === "true",
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -47,6 +50,7 @@ const nextConfig: NextConfig = {
   env: {
     LOG_LEVEL: process.env.LOG_LEVEL || "info",
     RATE_LIMIT_ENABLED: process.env.RATE_LIMIT_ENABLED || "true",
+    NEXT_PUBLIC_BETA_MODE: process.env.BETA_MODE || "false",
   },
 
   // Headers for security and performance

@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { verifyRestaurantAccess, resolveRestaurantIdForAdmin } from "@/lib/rbac-helpers";
+import { handleApiError } from "@/lib/api-error-handler";
+import { createAuditLog } from "@/lib/audit-log";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     // Await params (Next.js 16 requirement)
     const params = await context.params;
@@ -20,39 +29,18 @@ export async function PATCH(
       );
     }
 
-    // Check authentication
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Authentication required", success: false },
-        { status: 401 }
-      );
-    }
-
-    // Get user's restaurant
-    let restaurant;
-    try {
-      restaurant = await getUserRestaurant(session.id);
-      if (!restaurant) {
-        return NextResponse.json(
-          { error: "Restaurant not found", success: false },
-          { status: 404 }
-        );
-      }
-    } catch (authError) {
-      console.error("Auth error in PATCH:", authError);
-      return NextResponse.json(
-        { error: "Failed to verify restaurant access", success: false },
-        { status: 500 }
-      );
-    }
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
 
     // Parse request body
     let body: unknown;
     try {
       body = await request.json();
     } catch (parseError) {
-      console.error("Invalid JSON body:", parseError);
       return NextResponse.json(
         { error: "Invalid JSON body", success: false },
         { status: 400 }
@@ -75,16 +63,11 @@ export async function PATCH(
       categoryId?: unknown;
     };
 
-    // Verify menu item exists and belongs to restaurant
+    // Verify menu item exists
     let existingItem;
     try {
-      existingItem = await prisma.menuItem.findFirst({
-        where: {
-          id: id.trim(),
-          category: {
-            restaurantId: restaurant.id,
-          },
-        },
+      existingItem = await prisma.menuItem.findUnique({
+        where: { id: id.trim() },
         include: {
           category: true,
         },
@@ -92,12 +75,15 @@ export async function PATCH(
 
       if (!existingItem) {
         return NextResponse.json(
-          { error: "Menu item not found or access denied", success: false },
+          { error: "Menu item not found", success: false },
           { status: 404 }
         );
       }
+
+      // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's menu items
+      verifyRestaurantAccess(userForScope, existingItem.category.restaurantId);
     } catch (dbError) {
-      console.error("Database error checking menu item:", dbError);
+      logger.error("Database error checking menu item", { menuItemId: id }, dbError instanceof Error ? dbError : undefined);
       return NextResponse.json(
         { error: "Failed to verify menu item", success: false },
         { status: 500 }
@@ -167,24 +153,29 @@ export async function PATCH(
         );
       }
 
-      // Verify category belongs to restaurant
+      // CRITICAL: Defense in depth - Verify category exists and filter by restaurantId
       let category;
       try {
+        const categoryRestaurantId = authUser.role === "SUPER_ADMIN" ? undefined : userForScope.restaurantId;
+        const categoryWhere = categoryRestaurantId
+          ? { id: categoryId.trim(), restaurantId: categoryRestaurantId }
+          : { id: categoryId.trim() };
+          
         category = await prisma.category.findFirst({
-          where: {
-            id: categoryId.trim(),
-            restaurantId: restaurant.id,
-          },
+          where: categoryWhere,
         });
 
         if (!category) {
           return NextResponse.json(
-            { error: "Category not found or access denied", success: false },
+            { error: "Category not found", success: false },
             { status: 404 }
           );
         }
+
+        // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's categories
+        verifyRestaurantAccess(userForScope, category.restaurantId);
       } catch (dbError) {
-        console.error("Database error checking category:", dbError);
+        logger.error("Database error checking category", { menuItemId: id }, dbError instanceof Error ? dbError : undefined);
         return NextResponse.json(
           { error: "Failed to verify category", success: false },
           { status: 500 }
@@ -212,10 +203,31 @@ export async function PATCH(
             select: {
               id: true,
               name: true,
+              restaurantId: true,
+              restaurant: {
+                select: {
+                  districtId: true,
+                },
+              },
             },
           },
         },
       });
+
+      // Audit log: MENU_ITEM_UPDATED
+      const districtId = updatedItem.category.restaurant?.districtId;
+      if (districtId) {
+        await createAuditLog({
+          districtId,
+          userId: authUser.id,
+          userRole: authUser.role,
+          action: "MENU_ITEM_UPDATED",
+          entityType: "MenuItem",
+          entityId: updatedItem.id,
+          metadata: { name: updatedItem.name, price: updatedItem.price, changes: Object.keys(updateData) },
+          request,
+        });
+      }
 
       return NextResponse.json(
         {
@@ -226,8 +238,6 @@ export async function PATCH(
         { status: 200 }
       );
     } catch (prismaError) {
-      console.error("Prisma update error:", prismaError);
-
       if (prismaError instanceof Prisma.PrismaClientKnownRequestError) {
         if (prismaError.code === "P2025") {
           return NextResponse.json(
@@ -256,23 +266,7 @@ export async function PATCH(
       throw prismaError;
     }
   } catch (error) {
-    console.error("Admin menu-items PATCH error:", error);
-
-    // Ensure we always return proper JSON
-    if (error instanceof Error) {
-      return NextResponse.json(
-        {
-          error: `Internal server error: ${error.message}`,
-          success: false,
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Internal server error", success: false },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
@@ -280,6 +274,9 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     // Await params (Next.js 16 requirement)
     const params = await context.params;
@@ -293,72 +290,73 @@ export async function DELETE(
       );
     }
 
-    // Check authentication
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Authentication required", success: false },
-        { status: 401 }
-      );
-    }
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
 
-    // Get user's restaurant
-    let restaurant;
-    try {
-      restaurant = await getUserRestaurant(session.id);
-      if (!restaurant) {
-        return NextResponse.json(
-          { error: "Restaurant not found", success: false },
-          { status: 404 }
-        );
-      }
-    } catch (authError) {
-      console.error("Auth error in DELETE:", authError);
-      return NextResponse.json(
-        { error: "Failed to verify restaurant access", success: false },
-        { status: 500 }
-      );
-    }
-
-    // Verify menu item belongs to restaurant
+    // Verify menu item exists
     let existingItem;
     try {
-      existingItem = await prisma.menuItem.findFirst({
-        where: {
-          id: id.trim(),
+      existingItem = await prisma.menuItem.findUnique({
+        where: { id: id.trim() },
+        include: {
           category: {
-            restaurantId: restaurant.id,
+            include: {
+              restaurant: {
+                select: {
+                  districtId: true,
+                },
+              },
+            },
           },
         },
       });
 
       if (!existingItem) {
         return NextResponse.json(
-          { error: "Menu item not found or access denied", success: false },
+          { error: "Menu item not found", success: false },
           { status: 404 }
         );
       }
+
+      // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's menu items
+      verifyRestaurantAccess(userForScope, existingItem.category.restaurantId);
     } catch (dbError) {
-      console.error("Database error checking menu item:", dbError);
-      return NextResponse.json(
-        { error: "Failed to verify menu item", success: false },
-        { status: 500 }
-      );
+      return handleApiError(dbError, "Failed to verify menu item");
     }
 
     // Delete menu item
     try {
+      // Get districtId before deletion
+      const districtId = existingItem.category.restaurant?.districtId;
+      const menuItemName = existingItem.name;
+
       await prisma.menuItem.delete({
         where: { id: id.trim() },
       });
+
+      // Audit log: MENU_ITEM_DELETED
+      if (districtId) {
+        await createAuditLog({
+          districtId,
+          userId: authUser.id,
+          userRole: authUser.role,
+          action: "MENU_ITEM_DELETED",
+          entityType: "MenuItem",
+          entityId: id.trim(),
+          metadata: { name: menuItemName },
+          request,
+        });
+      }
 
       return NextResponse.json(
         { message: "Menu item deleted successfully", success: true },
         { status: 200 }
       );
     } catch (prismaError) {
-      console.error("Prisma delete error:", prismaError);
-
       if (prismaError instanceof Prisma.PrismaClientKnownRequestError) {
         if (prismaError.code === "P2025") {
           return NextResponse.json(
@@ -371,21 +369,6 @@ export async function DELETE(
       throw prismaError;
     }
   } catch (error) {
-    console.error("Admin menu-items DELETE error:", error);
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        {
-          error: `Internal server error: ${error.message}`,
-          success: false,
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Internal server error", success: false },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to delete menu item");
   }
 }

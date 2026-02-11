@@ -1,18 +1,14 @@
 /**
  * Test Mode Detection and Mock Data for Playwright E2E Tests
- * 
- * This module provides test-mode detection and mock data generators
- * to accelerate API responses during E2E testing.
- * 
+ *
  * When PLAYWRIGHT=true or NODE_ENV=test (and NOT in production):
  * - APIs return instant mock data
  * - Skip heavy Prisma aggregations
- * - Skip background polling/jobs
- * - Dashboard loads under 2s
- * 
- * IMPORTANT: isTestMode is NEVER true when NODE_ENV === "production",
- * so test-mode bypass cannot affect production.
+ *
+ * IMPORTANT: isTestMode is NEVER true when NODE_ENV === "production".
  */
+
+import { logger } from "./logger";
 
 export const isTestMode =
   process.env.NODE_ENV !== "production" &&
@@ -334,6 +330,6 @@ export function shouldUseTestMode(): boolean {
  */
 export function logTestMode(endpoint: string): void {
   if (isTestMode) {
-    console.log(`[TEST MODE] ${endpoint} - returning mock data`);
+    logger.info("[TEST MODE] Mock data returned", { endpoint });
   }
 }

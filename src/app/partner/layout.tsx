@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requirePartner } from "@/lib/auth";
+import { requirePartner } from "@/lib/require-role";
 import PartnerSidebar from "@/components/partner/PartnerSidebar";
 
 export const dynamic = "force-dynamic";

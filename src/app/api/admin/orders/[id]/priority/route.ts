@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { verifyRestaurantAccess, resolveRestaurantIdForAdmin } from "@/lib/rbac-helpers";
+import { handleApiError } from "@/lib/api-error-handler";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
 
-    const restaurant = await getUserRestaurant(session.id);
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    }
+  try {
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
 
     const { id: orderId } = await context.params;
 
@@ -32,17 +36,23 @@ export async function PATCH(
       return NextResponse.json({ error: "isPriority must be a boolean" }, { status: 400 });
     }
 
-    // Verify order belongs to restaurant
+    // CRITICAL: Defense in depth - Filter by both id AND restaurantId
+    const restaurantId = authUser.role === "SUPER_ADMIN" ? undefined : userForScope.restaurantId;
+    const whereClause = restaurantId 
+      ? { id: orderId, restaurantId } 
+      : { id: orderId };
+
+    // Verify order exists
     const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        restaurantId: restaurant.id,
-      },
+      where: whereClause,
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Order not found or access denied" }, { status: 404 });
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's orders
+    verifyRestaurantAccess(userForScope, order.restaurantId);
 
     // Track previous priority for audit log
     const previousPriority = order.isPriority;
@@ -64,7 +74,7 @@ export async function PATCH(
             newPriority: isPriority,
             orderId: order.id,
           }),
-          userId: session.id,
+          userId: authUser.id,
         },
       });
     }
@@ -88,7 +98,6 @@ export async function PATCH(
 
     return NextResponse.json(updatedOrder, { status: 200 });
   } catch (error) {
-    console.error("Admin orders priority PATCH error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError(error, "Failed to update order priority");
   }
 }

@@ -20,9 +20,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const totalItems = (Array.isArray(categories) ? categories : []).reduce((s, c) => s + (c.items?.length ?? 0), 0);
-    console.log("[QR Menu API] restaurantId:", restaurantId, "categories:", categories?.length ?? 0, "totalItems:", totalItems);
-
     return NextResponse.json(Array.isArray(categories) ? categories : []);
   } catch (error) {
     console.error("Menu API error:", error);

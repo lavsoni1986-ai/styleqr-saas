@@ -1,12 +1,13 @@
 import { QrCode } from "lucide-react";
 import { prisma } from "@/lib/prisma.server";
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 import QRGeneratorTables from "@/components/dashboard/QRGeneratorTables";
 
 export const dynamic = "force-dynamic";
 
 export default async function QRGeneratorPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
 
   if (!restaurant) {

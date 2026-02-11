@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { verifyRestaurantAccess, resolveRestaurantIdForAdmin } from "@/lib/rbac-helpers";
+import { handleApiError } from "@/lib/api-error-handler";
 import { processOrderCommission } from "@/lib/commission.server";
 import { createBillFromOrder } from "@/lib/billing.server";
 import { OrderStatus } from "@prisma/client";
 import { isTestMode, logTestMode } from "@/lib/test-mode";
+import { createAuditLog } from "@/lib/audit-log";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     const { id: orderId } = await context.params;
 
@@ -30,15 +39,12 @@ export async function PATCH(
       }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
-
-    const restaurant = await getUserRestaurant(session.id);
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    }
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
 
     let body: unknown;
     try {
@@ -53,17 +59,30 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    // Verify order belongs to restaurant
+    // CRITICAL: Defense in depth - Filter by both id AND restaurantId
+    const restaurantId = authUser.role === "SUPER_ADMIN" ? undefined : userForScope.restaurantId;
+    const whereClause = restaurantId 
+      ? { id: orderId, restaurantId } 
+      : { id: orderId };
+
+    // Verify order exists and user has access
     const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        restaurantId: restaurant.id,
+      where: whereClause,
+      include: {
+        restaurant: {
+          select: {
+            districtId: true,
+          },
+        },
       },
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Order not found or access denied" }, { status: 404 });
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's orders
+    verifyRestaurantAccess(userForScope, order.restaurantId);
 
     // Track previous status for audit log
     const previousStatus = order.status;
@@ -74,7 +93,22 @@ export async function PATCH(
       data: { status: status as OrderStatus },
     });
 
-    // Create audit log if status changed to CANCELLED
+    // Audit log: ORDER_STATUS_CHANGED
+    const districtId = order.restaurant?.districtId;
+    if (districtId && previousStatus !== status) {
+      await createAuditLog({
+        districtId,
+        userId: authUser.id,
+        userRole: authUser.role,
+        action: "ORDER_STATUS_CHANGED",
+        entityType: "Order",
+        entityId: order.id,
+        metadata: { previousStatus, newStatus: status, orderId: order.id },
+        request,
+      });
+    }
+
+    // Create order audit log if status changed to CANCELLED (legacy)
     if (status === "CANCELLED" && previousStatus !== "CANCELLED") {
       await prisma.orderAuditLog.create({
         data: {
@@ -85,7 +119,7 @@ export async function PATCH(
             newStatus: status,
             orderId: order.id,
           }),
-          userId: session.id,
+          userId: authUser.id,
         },
       });
     }
@@ -96,13 +130,12 @@ export async function PATCH(
       try {
         const commissionResult = await processOrderCommission(orderId);
         if (commissionResult.success && commissionResult.commissionId) {
-          console.log(`Commission calculated for order ${orderId}: ${commissionResult.commissionId}`);
+          logger.info("Commission calculated", { orderId, commissionId: commissionResult.commissionId });
         } else if (commissionResult.error) {
-          console.warn(`Commission calculation failed for order ${orderId}: ${commissionResult.error}`);
+          logger.warn("Commission calculation failed", { orderId, error: commissionResult.error });
         }
-        // Don't fail the order update if commission calculation fails
       } catch (commissionError) {
-        console.error("Error processing commission:", commissionError);
+        logger.error("Error processing commission", { orderId }, commissionError instanceof Error ? commissionError : undefined);
         // Continue with order update even if commission fails
       }
 
@@ -110,13 +143,12 @@ export async function PATCH(
       try {
         const billResult = await createBillFromOrder(orderId);
         if (billResult.success && billResult.billId) {
-          console.log(`Bill created for order ${orderId}: ${billResult.billId}`);
+          logger.info("Bill created", { orderId, billId: billResult.billId });
         } else if (billResult.error) {
-          console.warn(`Bill creation failed for order ${orderId}: ${billResult.error}`);
+          logger.warn("Bill creation failed", { orderId, error: billResult.error });
         }
-        // Don't fail the order update if bill creation fails
       } catch (billError) {
-        console.error("Error creating bill from order:", billError);
+        logger.error("Error creating bill from order", { orderId }, billError instanceof Error ? billError : undefined);
         // Continue with order update even if bill creation fails
       }
     }
@@ -140,8 +172,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedOrder, { status: 200 });
   } catch (error) {
-    console.error("Admin orders PATCH error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError(error, "Failed to update order");
   }
 }
 
@@ -149,6 +180,9 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     const { id: orderId } = await context.params;
 
@@ -158,30 +192,33 @@ export async function DELETE(
       return NextResponse.json({ message: "Order deleted successfully" }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
 
-    const restaurant = await getUserRestaurant(session.id);
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    }
+    // CRITICAL: Defense in depth - Filter by both id AND restaurantId
+    const restaurantId = authUser.role === "SUPER_ADMIN" ? undefined : userForScope.restaurantId;
+    const whereClause = restaurantId 
+      ? { id: orderId, restaurantId } 
+      : { id: orderId };
 
-    // Verify order belongs to restaurant
+    // Verify order exists and user has access
     const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        restaurantId: restaurant.id,
-      },
+      where: whereClause,
       include: {
         items: true,
       },
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Order not found or access denied" }, { status: 404 });
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's orders
+    verifyRestaurantAccess(userForScope, order.restaurantId);
 
     // Only allow deletion of SERVED orders
     if (order.status !== OrderStatus.SERVED) {
@@ -202,7 +239,7 @@ export async function DELETE(
           total: order.total,
           itemCount: order.items.length,
         }),
-        userId: session.id,
+          userId: authUser.id,
       },
     });
 
@@ -216,7 +253,6 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Admin orders DELETE error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError(error, "Failed to delete order");
   }
 }

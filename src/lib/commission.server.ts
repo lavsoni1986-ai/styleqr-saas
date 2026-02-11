@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma.server";
 import { Prisma } from "@prisma/client";
+import { logger } from "./logger";
 
 /**
  * Calculate commission for an order
@@ -107,7 +108,7 @@ export async function createOrderCommission(
       commissionId: commission.id,
     };
   } catch (error) {
-    console.error("Error creating order commission:", error);
+    logger.error("Error creating order commission", { orderId, restaurantId, partnerId }, error instanceof Error ? error : undefined);
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
@@ -182,7 +183,7 @@ export async function processOrderCommission(orderId: string): Promise<{
       commissionRate
     );
   } catch (error) {
-    console.error("Error processing order commission:", error);
+    logger.error("Error processing order commission", { orderId }, error instanceof Error ? error : undefined);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to process commission",

@@ -1,11 +1,12 @@
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 import { Settings } from "lucide-react";
 import SettingsContent from "@/components/dashboard/SettingsContent";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
 
   if (!restaurant) {

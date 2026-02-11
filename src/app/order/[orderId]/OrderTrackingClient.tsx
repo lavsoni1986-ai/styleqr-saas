@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { getCloudinaryThumbnail } from "@/lib/cloudinary";
 import {
   Clock,
   CheckCircle,
@@ -77,8 +78,7 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
       setTimeElapsed(Math.floor((now - createdAt) / 1000));
 
       setLoading(false);
-    } catch (err) {
-      console.error("Error fetching order:", err);
+    } catch {
       setError("Network error. Please try again.");
       setLoading(false);
     }
@@ -292,8 +292,8 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
                 {item.menuItem.image && (
                   <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-white/10">
                     <Image
-                      src={item.menuItem.image}
-                      alt={item.menuItem.name}
+                      src={getCloudinaryThumbnail(item.menuItem.image, { width: 128, height: 128 })}
+                      alt={item.menuItem.name || "Order item"}
                       fill
                       className="object-cover"
                       sizes="64px"

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 import { paymentService } from "@/lib/payments/payment.service";
 import { prisma } from "@/lib/prisma.server";
 import { PaymentStatus } from "@prisma/client";
@@ -12,12 +12,12 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }

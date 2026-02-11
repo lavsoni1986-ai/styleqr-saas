@@ -51,7 +51,7 @@ export const Modal = ({ isOpen, onClose, title, children, footer }: ModalProps) 
             <X className="h-5 w-5 text-zinc-400" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 p-6 text-zinc-300">{children}</div>
+        <div className="overflow-y-auto flex-1 p-6 text-zinc-300 dark-theme-inputs">{children}</div>
         {footer && (
           <div className="px-6 py-4 border-t border-white/10 flex-shrink-0 bg-white/5">{footer}</div>
         )}

@@ -1,43 +1,77 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { verifyRestaurantAccess, resolveRestaurantIdForAdmin } from "@/lib/rbac-helpers";
+import { handleApiError } from "@/lib/api-error-handler";
+import { createAuditLog } from "@/lib/audit-log";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
 
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
 
-    const restaurant = await getUserRestaurant(session.id);
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    }
+  try {
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
 
     const { id } = await context.params;
 
-    // Verify table belongs to restaurant
+    // CRITICAL: Defense in depth - Filter by both id AND restaurantId
+    const restaurantId = authUser.role === "SUPER_ADMIN" ? undefined : userForScope.restaurantId;
+    const whereClause = restaurantId 
+      ? { id, restaurantId } 
+      : { id };
+
+    // Verify table exists
     const table = await prisma.table.findFirst({
-      where: {
-        id,
-        restaurantId: restaurant.id,
+      where: whereClause,
+      include: {
+        restaurant: {
+          select: {
+            districtId: true,
+          },
+        },
       },
     });
 
     if (!table) {
-      return NextResponse.json({ error: "Table not found or access denied" }, { status: 404 });
+      return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
+
+    // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's tables
+    verifyRestaurantAccess(userForScope, table.restaurantId);
+
+    const tableName = table.name;
 
     await prisma.table.delete({
       where: { id },
     });
 
+    // Audit log: TABLE_DELETED
+    const districtId = table.restaurant?.districtId;
+    if (districtId) {
+      await createAuditLog({
+        districtId,
+        userId: authUser.id,
+        userRole: authUser.role,
+        action: "TABLE_DELETED",
+        entityType: "Table",
+        entityId: id,
+        metadata: { name: tableName },
+        request,
+      });
+    }
+
     return NextResponse.json({ message: "Table deleted successfully" }, { status: 200 });
   } catch (error) {
-    console.error("Admin tables DELETE error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError(error, "Failed to delete table");
   }
 }

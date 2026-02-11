@@ -8,6 +8,7 @@ import {
   Building2,
   TrendingUp,
   LogOut,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -17,6 +18,11 @@ const menuItems = [
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/district",
+  },
+  {
+    title: "Operations",
+    icon: Activity,
+    href: "/district/dashboard",
   },
   {
     title: "Partners",
@@ -58,7 +64,14 @@ export default function DistrictSidebar() {
   return (
     <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full">
       <div className="p-6 border-b border-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900">District Admin</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900">District Admin</h1>
+          {process.env.NEXT_PUBLIC_BETA_MODE === "true" && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 font-medium">
+              Beta
+            </span>
+          )}
+        </div>
         <p className="text-sm text-slate-500 mt-1">District Management</p>
       </div>
 

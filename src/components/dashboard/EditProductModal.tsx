@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { X, Upload, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { uploadToCloudinary } from "@/lib/cloudinary";
+import { uploadToCloudinary, getCloudinaryThumbnail } from "@/lib/cloudinary";
 
 interface Product {
   id: string;
@@ -227,29 +227,29 @@ export default function EditProductModal({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Edit Product">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-800 text-sm">{error}</span>
+            <div className="mb-4 p-3 bg-red-950/50 border border-red-800 rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-400" />
+              <span className="text-red-300 text-sm">{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-green-800 text-sm">{success}</span>
+            <div className="mb-4 p-3 bg-emerald-950/50 border border-emerald-800 rounded-lg flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-400" />
+              <span className="text-emerald-300 text-sm">{success}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Product Name *</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Product Name *</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-dark w-full px-3 py-2"
               placeholder="Enter product name"
               required
               disabled={isLoading}
@@ -257,16 +257,16 @@ export default function EditProductModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Price *</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Price *</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">$</span>
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.price}
                 onChange={(e) => handleInputChange("price", e.target.value)}
-                className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="input-dark w-full pl-8 pr-3 py-2"
                 placeholder="0.00"
                 required
                 disabled={isLoading}
@@ -275,11 +275,11 @@ export default function EditProductModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Category *</label>
             <select
               value={formData.categoryId}
               onChange={(e) => handleInputChange("categoryId", e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-dark w-full px-3 py-2"
               required
               disabled={isLoading}
             >
@@ -293,25 +293,25 @@ export default function EditProductModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Description</label>
             <textarea
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+              className="input-dark w-full px-3 py-2 resize-none"
               placeholder="Enter product description (optional)"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Product Image</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Product Image</label>
 
             {formData.image && (
-              <div className="mb-3 relative w-32 h-32 rounded-lg border border-slate-200 overflow-hidden">
+              <div className="mb-3 relative w-32 h-32 rounded-lg border border-gray-800 overflow-hidden">
                 <Image
-                  src={formData.image}
-                  alt="Product preview"
+                  src={getCloudinaryThumbnail(formData.image, { width: 256, height: 256 })}
+                  alt={product?.name ? `${product.name} preview` : "Product preview"}
                   fill
                   className="object-cover"
                   sizes="128px"
@@ -320,7 +320,7 @@ export default function EditProductModal({
             )}
 
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/10 text-zinc-300 rounded-lg hover:bg-white/20 cursor-pointer transition-colors">
                 {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 {isUploading ? "Uploading..." : "Upload Image"}
                 <input
@@ -336,14 +336,14 @@ export default function EditProductModal({
                 <button
                   type="button"
                   onClick={() => handleInputChange("image", "")}
-                  className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                   disabled={isLoading || isUploading}
                 >
                   Remove
                 </button>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Recommended: 400x400px, JPG or PNG, max 5MB</p>
+            <p className="text-xs text-gray-500 mt-1">Recommended: 400x400px, JPG or PNG, max 5MB</p>
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -351,14 +351,14 @@ export default function EditProductModal({
               type="button"
               onClick={handleClose}
               disabled={isLoading || isUploading}
-              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 btn-secondary-admin disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading || isUploading || !formData.name.trim() || !formData.price || !formData.categoryId}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 btn-primary-admin disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>

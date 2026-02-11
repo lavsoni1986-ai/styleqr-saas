@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma.server";
-import { hashPassword, setSession } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
 import { randomUUID } from "crypto";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const signupSchema = z.object({
   restaurantName: z.string().min(2, "Restaurant name must be at least 2 characters").optional().default("Test Restaurant"),
@@ -13,6 +15,9 @@ const signupSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.signup);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     const body = await request.json();
 
@@ -51,6 +56,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Link user to restaurant (required for session/jwt and admin API access)
+      await tx.user.update({
+        where: { id: user.id },
+        data: { restaurantId: restaurant.id },
+      });
+
       // Create first table with QR token
       const qrToken = `qr_${randomUUID().replace(/-/g, "")}`;
       await tx.table.create({
@@ -61,18 +72,14 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return { user, restaurant };
+      const updatedUser = await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: { id: true, email: true, name: true, role: true, restaurantId: true },
+      });
+      return { user: updatedUser, restaurant };
     });
 
-    // Set session
-    await setSession({
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      role: "RESTAURANT_OWNER",
-      restaurantId: result.restaurant.id,
-    });
-
+    // Client will call signIn("credentials", { email, password }) to create session
     return NextResponse.json(
       {
         success: true,
@@ -90,7 +97,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Signup error:", error);
+    logger.error("Signup error", {}, error instanceof Error ? error : undefined);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 });

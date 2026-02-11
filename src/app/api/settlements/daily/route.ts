@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma.server";
 import { SettlementStatus } from "@prisma/client";
 import { isTestMode, testMockData, logTestMode } from "@/lib/test-mode";
@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(testMockData.settlement, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -94,6 +94,17 @@ export async function GET(request: NextRequest) {
         CREDIT: 0,
       };
 
+      const paymentIds = bills.flatMap((b) => b.payments.map((p) => p.id));
+      // Batch query tips (no N+1)
+      const tips =
+        paymentIds.length > 0
+          ? await prisma.tip.findMany({
+              where: { paymentId: { in: paymentIds } },
+              select: { paymentId: true, amount: true },
+            })
+          : [];
+      const tipByPaymentId = new Map(tips.map((t) => [t.paymentId, t.amount]));
+
       let totalSales = 0;
       let totalRefunds = 0;
       let totalTips = 0;
@@ -106,14 +117,7 @@ export async function GET(request: NextRequest) {
         for (const payment of bill.payments) {
           const method = payment.method as string;
           paymentBreakdown[method] = (paymentBreakdown[method] || 0) + payment.amount;
-
-          // Check for tips
-          const tip = await prisma.tip.findFirst({
-            where: { paymentId: payment.id },
-          });
-          if (tip) {
-            totalTips += tip.amount;
-          }
+          totalTips += tipByPaymentId.get(payment.id) ?? 0;
         }
       }
 

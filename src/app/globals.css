@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@keyframes hero-beam {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -13,7 +18,7 @@
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Fix Chrome input text visibility - must be outside @layer for !important to work */
@@ -46,6 +51,59 @@ input:-webkit-autofill:focus {
   transition: background-color 5000s ease-in-out 0s;
 }
 
+/* Dark modal/checkout: ensure inputs have visible text (override global dark-text rule) */
+.dark-modal input[type="text"],
+.dark-modal input[type="email"],
+.dark-modal input[type="password"],
+.dark-modal input[type="number"],
+.dark-modal textarea {
+  color: rgb(255, 255, 255) !important;
+  -webkit-text-fill-color: rgb(255, 255, 255) !important;
+}
+
+.dark-modal input::placeholder,
+.dark-modal textarea::placeholder {
+  color: rgb(107, 114, 128) !important;
+}
+
+/* Force dark background and visible text on number inputs in billing modal (browser defaults can override) */
+.dark-modal input[type="number"] {
+  background-color: rgb(9, 9, 11) !important; /* zinc-950 */
+  color: rgb(255, 255, 255) !important;
+  -webkit-text-fill-color: rgb(255, 255, 255) !important;
+  caret-color: rgb(245, 158, 11) !important; /* amber-500 */
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+/* Auth pages (login): dark background, ensure input text is visible */
+.auth-dark-inputs input[type="text"],
+.auth-dark-inputs input[type="email"],
+.auth-dark-inputs input[type="password"] {
+  color: rgb(255, 255, 255) !important;
+  -webkit-text-fill-color: rgb(255, 255, 255) !important;
+}
+
+.auth-dark-inputs input::placeholder {
+  color: rgb(107, 114, 128) !important;
+}
+
+/* Dashboard/dark theme: consistent input styling */
+.dark-theme-inputs input[type="text"],
+.dark-theme-inputs input[type="email"],
+.dark-theme-inputs input[type="password"],
+.dark-theme-inputs input[type="number"],
+.dark-theme-inputs textarea,
+.dark-theme-inputs select {
+  color: rgb(255, 255, 255) !important;
+  -webkit-text-fill-color: rgb(255, 255, 255) !important;
+}
+
+.dark-theme-inputs input::placeholder,
+.dark-theme-inputs textarea::placeholder {
+  color: rgb(107, 114, 128) !important;
+}
+
 /* Admin panel: premium dark theme with gold/orange accent */
 @layer utilities {
   .text-balance {
@@ -66,6 +124,11 @@ input:-webkit-autofill:focus {
 
   .btn-secondary-admin {
     @apply bg-white/10 border border-white/10 text-zinc-300 rounded-xl px-4 py-2 hover:bg-white/20 transition;
+  }
+
+  /* Consistent dark input styling for dashboard (International Wow theme) */
+  .input-dark {
+    @apply bg-zinc-900/80 border border-gray-800 rounded-xl text-white placeholder:text-gray-500 px-4 py-3 caret-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-colors;
   }
 
   /* Mobile optimizations */
@@ -89,6 +152,14 @@ input:-webkit-autofill:focus {
     display: none;
   }
 
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
   /* Smooth scrolling */
   html {
     scroll-behavior: smooth;
@@ -98,5 +169,11 @@ input:-webkit-autofill:focus {
   button {
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+  }
+
+  /* Remove blue selection highlight, use amber for focus */
+  input::selection,
+  textarea::selection {
+    background-color: rgb(245 158 11 / 0.3);
   }
 }

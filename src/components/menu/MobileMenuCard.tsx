@@ -3,6 +3,7 @@
 import { Plus, Minus, Utensils } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { getCloudinaryThumbnail } from "@/lib/cloudinary";
 
 export interface MobileMenuItem {
   id: string;
@@ -30,8 +31,8 @@ export function MobileMenuCard({ item, quantity, onAdd, onRemove, priority }: Mo
       <div className="relative w-full h-48 sm:h-56 overflow-hidden bg-white/5">
         {item.image && !imageError ? (
           <Image
-            src={item.image}
-            alt={item.name}
+            src={getCloudinaryThumbnail(item.image, { width: 448, height: 448 })}
+            alt={item.name || "Menu item"}
             fill
             className="object-cover"
             sizes="(max-width: 640px) 100vw, 50vw"

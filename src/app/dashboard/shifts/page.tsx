@@ -1,10 +1,11 @@
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 import ShiftsContent from "@/components/dashboard/ShiftsContent";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShiftsPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
 
   if (!restaurant) {

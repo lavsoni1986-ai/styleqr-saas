@@ -13,7 +13,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-zinc-950 flex">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-zinc-950/50">
+      <main className="flex-1 overflow-y-auto bg-zinc-950/50 dark-theme-inputs">
         {children}
       </main>
     </div>

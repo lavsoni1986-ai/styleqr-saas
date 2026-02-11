@@ -7,6 +7,7 @@ Run the app in production mode on a LAN IP. Cookies work over HTTP; no redirect 
 In `.env` (create from `deployment/env.lan.template`):
 
 ```env
+NEXTAUTH_URL=http://192.168.31.135:3000
 NEXT_PUBLIC_APP_URL=http://192.168.31.135:3000
 ```
 
@@ -40,6 +41,16 @@ npm run start:lan
 
 - Open **only** `http://192.168.31.135:3000` in the browser.
 - Do **not** use `http://localhost:3000`; the cookie is tied to the `Host` the server sees.
+
+## 4a. Mobile / IP testing (dev mode)
+
+If you get a NextAuth "Configuration" error when accessing via IP:
+
+1. **Update `.env`** – Set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to your IP (e.g. `http://192.168.31.135:3000`).
+2. **Restart dev server** – Stop `npm run dev` and run it again so env changes take effect.
+3. **Clear browser cache** – For the device/browser you're testing on:
+   - Clear cookies and local storage for `localhost:3000` and the IP URL.
+   - Or use an incognito/private window.
 
 ## 5. Verify
 

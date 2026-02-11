@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma.server";
 import { BillStatus } from "@prisma/client";
+import { logger } from "./logger";
 
 /**
  * Auto-create or update bill from SERVED order
@@ -64,7 +65,7 @@ export async function createBillFromOrder(orderId: string) {
 
     for (const orderItem of order.items) {
       if (!orderItem.menuItem) {
-        console.warn(`Order item ${orderItem.id} has no menu item, skipping`);
+        logger.warn(`Order item ${orderItem.id} has no menu item, skipping`);
         continue;
       }
 
@@ -153,7 +154,7 @@ export async function createBillFromOrder(orderId: string) {
         },
       });
 
-      console.log(`Added order ${orderId} items to existing bill ${updatedBill.billNumber}`);
+      logger.info(`Added order ${orderId} items to existing bill ${updatedBill.billNumber}`);
       return { success: true, bill: updatedBill, billId: updatedBill.id };
     }
 
@@ -222,10 +223,10 @@ export async function createBillFromOrder(orderId: string) {
       data: { lastBillNumber: newBillNumber },
     });
 
-    console.log(`Created bill ${billNumber} from order ${orderId} for table ${tableId}`);
+    logger.info(`Created bill ${billNumber} from order ${orderId} for table ${tableId}`);
     return { success: true, bill: newBill, billId: newBill.id };
   } catch (error) {
-    console.error("Error creating bill from order:", error);
+    logger.error("Error creating bill from order", { orderId }, error instanceof Error ? error : undefined);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

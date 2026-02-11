@@ -1,16 +1,20 @@
-import { redirect } from "next/navigation";
-import { requireSuperAdmin } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { pageGuard } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma.server";
 import PlatformDashboardContent from "@/components/platform/PlatformDashboardContent";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Platform Dashboard Page
+ * 
+ * SUPER_ADMIN-only platform management page.
+ * Only SUPER_ADMIN can access this route.
+ * RESTAURANT_ADMIN and other roles are redirected to /unauthorized.
+ */
 export default async function PlatformPage() {
-  try {
-    await requireSuperAdmin();
-  } catch (error) {
-    redirect("/login");
-  }
+  const user = await getAuthUser();
+  pageGuard(user, ["SUPER_ADMIN"]);
 
   // Load platform stats
   const [

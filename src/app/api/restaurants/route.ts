@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma.server";
 import { withApiAuth } from "@/lib/api-guard";
 import { getUserRestaurants } from "@/lib/tenant";
 import { restaurantCreateSchema, validateBodySafe } from "@/lib/validators";
-import { created, ok, badRequest, conflict, withErrorHandler } from "@/lib/api-response";
+import { created, ok, badRequest, conflict, forbidden, withErrorHandler } from "@/lib/api-response";
+import { canCreateRestaurant } from "@/lib/feature-gate";
 import { Role } from "@prisma/client";
 
 /**
@@ -66,7 +67,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     );
   }
 
-  const { name, description } = validation.data;
+  const { name, description, districtId } = validation.data as {
+    name: string;
+    description?: string;
+    districtId?: string;
+  };
 
   // Check for duplicate restaurant name per owner (prevent duplicates)
   const existingRestaurant = await prisma.restaurant.findFirst({
@@ -83,6 +88,34 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return conflict("A restaurant with this name already exists");
   }
 
+  // Feature Gate: Enforce restaurant creation limit if districtId is provided
+  if (districtId) {
+    // Get district with subscription info
+    const district = await prisma.district.findUnique({
+      where: { id: districtId },
+      select: {
+        id: true,
+        planType: true,
+        subscriptionStatus: true,
+        restaurants: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!district) {
+      return badRequest("District not found");
+    }
+
+    // Check if district can create more restaurants
+    const currentRestaurantCount = district.restaurants.length;
+    if (!canCreateRestaurant(district, currentRestaurantCount)) {
+      return forbidden(
+        `Restaurant limit reached. Your ${district.planType} plan allows up to 5 restaurants. Please upgrade to PRO or ENTERPRISE for unlimited restaurants.`
+      );
+    }
+  }
+
   // Create restaurant in transaction
   const restaurant = await prisma.$transaction(async (tx) => {
     // Create restaurant
@@ -90,11 +123,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       data: {
         name,
         ownerId: user.id,
+        districtId: districtId || null,
       },
       select: {
         id: true,
         name: true,
         ownerId: true,
+        districtId: true,
         createdAt: true,
         updatedAt: true,
       },

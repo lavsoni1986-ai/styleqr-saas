@@ -1,6 +1,7 @@
 import "server-only";
 import { PrismaClient } from "@prisma/client";
 import { getEnv } from "./env-validation";
+import { logger } from "./logger";
 
 /**
  * Production-grade Prisma Client Singleton
@@ -50,11 +51,7 @@ const prismaClient = createPrismaClient();
 if (process.env.NODE_ENV === "development") {
   prismaClient.$on("query" as never, (e: { query: string; params: string; duration: number }) => {
     if (process.env.PRISMA_QUERY_LOG === "true") {
-      console.log("[Prisma Query]", {
-        query: e.query,
-        params: e.params,
-        duration: `${e.duration}ms`,
-      });
+      logger.debug("Prisma query", { query: e.query, params: e.params, durationMs: e.duration });
     }
   });
 }

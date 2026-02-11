@@ -38,7 +38,6 @@ class OfflineQueueEngine {
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!window.indexedDB) {
-        console.warn("IndexedDB not supported, offline queue disabled");
         resolve();
         return;
       }
@@ -52,7 +51,6 @@ class OfflineQueueEngine {
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log("Offline queue initialized");
         resolve();
       };
 
@@ -90,7 +88,6 @@ class OfflineQueueEngine {
       const request = store.add(queuedAction);
 
       request.onsuccess = () => {
-        console.log(`Action queued: ${queuedAction.id}`, action);
         this.triggerSync();
         resolve(queuedAction.id);
       };
@@ -239,7 +236,6 @@ class OfflineQueueEngine {
           if (success) {
             await this.updateStatus(queued.id, "COMPLETED");
             await this.remove(queued.id);
-            console.log(`Synced action: ${queued.id}`);
           } else {
             await this.updateStatus(queued.id, "PENDING", "Execution failed");
           }
@@ -323,7 +319,6 @@ class OfflineQueueEngine {
         }
 
         default:
-          console.warn("Unknown action type:", (action as any).type);
           return false;
       }
     } catch (error) {

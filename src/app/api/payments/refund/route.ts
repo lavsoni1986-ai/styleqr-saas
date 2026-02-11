@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getUserRestaurant, requireRestaurantOwner } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
+import { requireRestaurantOwner } from "@/lib/require-role";
 import { paymentService } from "@/lib/payments/payment.service";
 import { prisma } from "@/lib/prisma.server";
 import { RefundStatus } from "@prisma/client";
@@ -12,14 +13,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
-
-    await requireRestaurantOwner();
-
-    const restaurant = await getUserRestaurant(session.id);
+    const user = await requireRestaurantOwner();
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -88,7 +83,7 @@ export async function POST(request: NextRequest) {
         reason: reason || refundResult.reason || null,
         gatewayRefundId: refundResult.gatewayRefundId || null,
         gatewayResponse: JSON.stringify(refundResult),
-        requestedBy: session.id,
+        requestedBy: user.id,
         succeededAt: refundResult.success ? new Date() : null,
       },
     });

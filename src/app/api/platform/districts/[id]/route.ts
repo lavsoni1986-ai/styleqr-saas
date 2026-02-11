@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma.server";
-import { requireSuperAdmin } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { createAuditLog } from "@/lib/audit-log";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +12,14 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.platform);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
-    await requireSuperAdmin();
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN"]);
+    if (guardError) return guardError;
+    const authUser = user!;
 
     const params = await context.params;
     const { id } = params;
@@ -102,6 +111,22 @@ export async function PATCH(
         },
       });
 
+      // Audit log: DISTRICT_SETTINGS_UPDATED
+      await createAuditLog({
+        districtId: district.id,
+        userId: authUser.id,
+        userRole: authUser.role,
+        action: "DISTRICT_SETTINGS_UPDATED",
+        entityType: "District",
+        entityId: district.id,
+        metadata: { 
+          changes: Object.keys(updateData),
+          name: district.name,
+          code: district.code,
+        },
+        request,
+      });
+
       return NextResponse.json(
         {
           message: "District updated successfully",
@@ -127,21 +152,6 @@ export async function PATCH(
     }
   } catch (error) {
     console.error("Platform districts PATCH error:", error);
-
-    if (error instanceof Error && error.message.includes("Super admin")) {
-      return NextResponse.json(
-        { error: "Super admin access required", success: false },
-        { status: 403 }
-      );
-    }
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: `Internal server error: ${error.message}`, success: false },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Internal server error", success: false },
       { status: 500 }
@@ -153,8 +163,13 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.platform);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
-    await requireSuperAdmin();
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN"]);
+    if (guardError) return guardError;
 
     const params = await context.params;
     const { id } = params;
@@ -219,21 +234,6 @@ export async function DELETE(
     }
   } catch (error) {
     console.error("Platform districts DELETE error:", error);
-
-    if (error instanceof Error && error.message.includes("Super admin")) {
-      return NextResponse.json(
-        { error: "Super admin access required", success: false },
-        { status: 403 }
-      );
-    }
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: `Internal server error: ${error.message}`, success: false },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Internal server error", success: false },
       { status: 500 }

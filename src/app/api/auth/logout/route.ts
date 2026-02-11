@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { clearSession } from "@/lib/auth";
+import { signOut } from "@/app/api/auth/[...nextauth]/route";
 
 export async function POST() {
-  await clearSession();
+  await signOut({ redirect: false });
   return NextResponse.json({ success: true }, { status: 200 });
 }

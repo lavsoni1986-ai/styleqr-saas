@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 import TipsContent from "@/components/dashboard/TipsContent";
 
 export const dynamic = "force-dynamic";
 
 export default async function TipsPage() {
-  const session = await getSession();
+  const session = await getAuthUser();
   if (!session) {
     redirect("/login");
   }

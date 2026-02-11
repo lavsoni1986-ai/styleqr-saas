@@ -1,5 +1,6 @@
 import nextDynamic from "next/dynamic";
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 
 const ReportsContent = nextDynamic(() => import("@/components/dashboard/ReportsContent"), {
   loading: () => (
@@ -13,7 +14,7 @@ const ReportsContent = nextDynamic(() => import("@/components/dashboard/ReportsC
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
 
   if (!restaurant) {

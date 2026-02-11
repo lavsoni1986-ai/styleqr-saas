@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma.server";
 import { SubscriptionStatus, SubscriptionPlan } from "@prisma/client";
+import { logger } from "./logger";
 
 /**
  * Subscription check result
@@ -16,6 +17,10 @@ export interface SubscriptionCheck {
 /**
  * Check if restaurant subscription is valid
  * Returns validation result with details
+ *
+ * Security: FAIL-CLOSED in production.
+ * - Any DB error, Stripe error, or undefined state → deny access
+ * - Development: fail-open allowed for DX
  */
 export async function checkRestaurantSubscription(
   restaurantId: string
@@ -30,6 +35,10 @@ export async function checkRestaurantSubscription(
     });
 
     if (!restaurant) {
+      logger.warn("Subscription verification failed", {
+        restaurantId,
+        reason: "restaurant_not_found",
+      });
       return {
         isValid: false,
         status: null,
@@ -137,6 +146,11 @@ export async function checkRestaurantSubscription(
         };
 
       default:
+        logger.warn("Subscription verification failed", {
+          restaurantId,
+          reason: "invalid_status",
+          status: subscription.status,
+        });
         return {
           isValid: false,
           status: subscription.status,
@@ -145,13 +159,28 @@ export async function checkRestaurantSubscription(
         };
     }
   } catch (error) {
-    console.error("Error checking restaurant subscription:", error);
-    // Fail open for development - allow access if check fails
+    logger.error(
+      "Subscription check system error",
+      { restaurantId },
+      error instanceof Error ? error : undefined
+    );
+
+    // FAIL-CLOSED in production: Deny access when state is uncertain
+    if (process.env.NODE_ENV === "production") {
+      return {
+        isValid: false,
+        status: null,
+        plan: null,
+        message: "Subscription verification failed",
+      };
+    }
+
+    // Development: Fail-open for DX (local DB down, etc.)
     return {
       isValid: true,
       status: "TRIAL" as SubscriptionStatus,
       plan: "BASIC" as SubscriptionPlan,
-      message: "Subscription check failed - allowing access",
+      message: "Subscription check failed - allowing access (dev only)",
     };
   }
 }

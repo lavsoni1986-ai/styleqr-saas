@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -38,17 +38,6 @@ export async function POST(request: NextRequest) {
     }
 
     // For network printers, we would typically use socket connection
-    // For now, log the print job and return success
-    // In production, integrate with actual printer driver or print service
-    
-    console.log("Print job:", {
-      type,
-      printer: printer || "default",
-      port: port || 9100,
-      dataLength: data.length,
-      restaurantId: restaurant.id,
-    });
-
     // TODO: Implement actual network printer socket connection
     // const socket = new Socket();
     // socket.connect(port, printer);

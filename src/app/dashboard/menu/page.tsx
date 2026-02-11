@@ -1,5 +1,6 @@
 import nextDynamic from "next/dynamic";
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 
 const MenuContent = nextDynamic(() => import("@/components/dashboard/MenuContent"), {
   loading: () => (
@@ -13,7 +14,7 @@ const MenuContent = nextDynamic(() => import("@/components/dashboard/MenuContent
 export const dynamic = "force-dynamic";
 
 export default async function MenuPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
 
   if (!restaurant) {

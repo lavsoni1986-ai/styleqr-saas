@@ -18,7 +18,10 @@ import {
   Menu,
   X,
   ChefHat,
+  ExternalLink,
 } from "lucide-react";
+
+const LAV_DIGITAL_URL = "https://lav-digital-site-git-main-lavsoni1986-ais-projects.vercel.app/";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
@@ -169,6 +172,11 @@ export default function Sidebar() {
               <span className="text-lg font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
                 StyleQR
               </span>
+              {process.env.NEXT_PUBLIC_BETA_MODE === "true" && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400/90 border border-amber-400/30 font-medium">
+                  Beta
+                </span>
+              )}
             </Link>
           </div>
 
@@ -194,7 +202,16 @@ export default function Sidebar() {
             })}
           </nav>
 
-          <div className="border-t border-white/10 p-4">
+          <div className="border-t border-white/10 p-4 space-y-3">
+            <a
+              href={LAV_DIGITAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-zinc-500 hover:text-amber-500 transition-colors"
+            >
+              <span>Developed by LavDigital</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
             <button
               onClick={handleLogout}
               disabled={isLoggingOut}
@@ -225,6 +242,11 @@ export default function Sidebar() {
             <span className="text-lg font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
               StyleQR
             </span>
+            {process.env.NEXT_PUBLIC_BETA_MODE === "true" && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400/90 border border-amber-400/30 font-medium">
+                Beta
+              </span>
+            )}
           </Link>
         </div>
 
@@ -249,7 +271,16 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
+        <div className="border-t border-white/10 p-4 space-y-3">
+          <a
+            href={LAV_DIGITAL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-2 text-xs text-zinc-500 hover:text-amber-500 transition-colors"
+          >
+            <span>Developed by LavDigital</span>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+          </a>
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}

@@ -1,252 +1,126 @@
 import "server-only";
+import pino from "pino";
 
 /**
- * Production-Grade Centralized Logging System
- * 
- * Features:
- * - Structured JSON logs
- * - Log levels (debug, info, warn, error)
- * - Request ID correlation
- * - API latency logging
- * - Production-safe redaction
- * - Environment-aware formatting
+ * Production-Grade Structured Logging (Pino)
+ *
+ * - JSON logs in production
+ * - Pretty print in development
+ * - Request correlation (requestId, userId, districtId, route, latency)
+ * - Sensitive data redaction (never log secrets)
  */
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+const SENSITIVE_KEYS = [
+  "password",
+  "token",
+  "secret",
+  "authorization",
+  "cookie",
+  "apiKey",
+  "api_key",
+  "accessToken",
+  "refreshToken",
+  "stripe",
+  "cashfree",
+  "cf_",
+  "sk_",
+  "pk_",
+  "whsec_",
+  "database_url",
+  "connection_string",
+];
 
-export interface LogContext {
-  requestId?: string;
-  userId?: string;
-  restaurantId?: string;
-  orderId?: string;
-  [key: string]: unknown;
+function redact(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(redact);
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const lowerKey = key.toLowerCase();
+    const isSensitive = SENSITIVE_KEYS.some(
+      (sk) => lowerKey.includes(sk.toLowerCase()) || (typeof value === "string" && value.startsWith(sk))
+    );
+    result[key] = isSensitive ? "[REDACTED]" : redact(value);
+  }
+  return result;
 }
 
-interface LogEntry {
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-  context?: LogContext;
-  error?: {
-    name: string;
-    message: string;
-    stack?: string;
-  };
-  duration?: number; // milliseconds
-  path?: string;
-  method?: string;
-  statusCode?: number;
-}
+const isProd = process.env.NODE_ENV === "production";
 
-class Logger {
-  private logLevel: LogLevel;
-  private isDevelopment: boolean;
-  private isProduction: boolean;
-
-  constructor() {
-    this.isDevelopment = process.env.NODE_ENV === "development";
-    this.isProduction = process.env.NODE_ENV === "production";
-    
-    // Determine log level from environment
-    const envLogLevel = (process.env.LOG_LEVEL || "info").toLowerCase() as LogLevel;
-    const validLevels: LogLevel[] = ["debug", "info", "warn", "error"];
-    this.logLevel = validLevels.includes(envLogLevel) ? envLogLevel : "info";
-  }
-
-  /**
-   * Check if a log level should be logged
-   */
-  private shouldLog(level: LogLevel): boolean {
-    const levels: LogLevel[] = ["debug", "info", "warn", "error"];
-    const currentIndex = levels.indexOf(this.logLevel);
-    const messageIndex = levels.indexOf(level);
-    return messageIndex >= currentIndex;
-  }
-
-  /**
-   * Redact sensitive information from log data
-   */
-  private redactSensitive(data: unknown): unknown {
-    if (typeof data !== "object" || data === null) {
-      return data;
-    }
-
-    if (Array.isArray(data)) {
-      return data.map((item) => this.redactSensitive(item));
-    }
-
-    const sensitiveKeys = [
-      "password",
-      "token",
-      "secret",
-      "authorization",
-      "cookie",
-      "apiKey",
-      "api_key",
-      "accessToken",
-      "refreshToken",
-    ];
-
-    const redacted = { ...data } as Record<string, unknown>;
-
-    for (const key in redacted) {
-      const lowerKey = key.toLowerCase();
-      if (sensitiveKeys.some((sk) => lowerKey.includes(sk))) {
-        redacted[key] = "[REDACTED]";
-      } else if (typeof redacted[key] === "object" && redacted[key] !== null) {
-        redacted[key] = this.redactSensitive(redacted[key]);
-      }
-    }
-
-    return redacted;
-  }
-
-  /**
-   * Format log entry based on environment
-   */
-  private formatLog(entry: LogEntry): string {
-    if (this.isDevelopment) {
-      // Human-readable format for development
-      const timestamp = new Date(entry.timestamp).toLocaleTimeString();
-      const level = entry.level.toUpperCase().padEnd(5);
-      const context = entry.context
-        ? ` ${JSON.stringify(this.redactSensitive(entry.context))}`
-        : "";
-      const error = entry.error
-        ? `\n  Error: ${entry.error.name}: ${entry.error.message}`
-        : "";
-      const duration = entry.duration ? ` (${entry.duration}ms)` : "";
-
-      return `[${timestamp}] ${level} ${entry.message}${context}${duration}${error}`;
-    } else {
-      // Structured JSON for production
-      return JSON.stringify({
-        ...entry,
-        context: entry.context ? this.redactSensitive(entry.context) : undefined,
-      });
-    }
-  }
-
-  /**
-   * Write log to output
-   */
-  private writeLog(entry: LogEntry): void {
-    if (!this.shouldLog(entry.level)) {
-      return;
-    }
-
-    const formatted = this.formatLog(entry);
-
-    switch (entry.level) {
-      case "error":
-        console.error(formatted);
-        break;
-      case "warn":
-        console.warn(formatted);
-        break;
-      case "debug":
-        console.debug(formatted);
-        break;
-      default:
-        console.log(formatted);
-    }
-  }
-
-  /**
-   * Create log entry
-   */
-  private createEntry(
-    level: LogLevel,
-    message: string,
-    context?: LogContext,
-    error?: Error,
-    duration?: number,
-    metadata?: { path?: string; method?: string; statusCode?: number }
-  ): LogEntry {
-    const entry: LogEntry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      ...(context && { context }),
-      ...(error && {
-        error: {
-          name: error.name,
-          message: error.message,
-          ...(this.isDevelopment && { stack: error.stack }),
+const pinoLogger = pino({
+  level: (process.env.LOG_LEVEL || "info").toLowerCase(),
+  formatters: {
+    level: (label) => ({ level: label }),
+    bindings: () => ({}),
+  },
+  ...(isProd
+    ? { timestamp: pino.stdTimeFunctions.isoTime }
+    : {
+        transport: {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+          },
         },
       }),
-      ...(duration !== undefined && { duration }),
-      ...(metadata?.path && { path: metadata.path }),
-      ...(metadata?.method && { method: metadata.method }),
-      ...(metadata?.statusCode && { statusCode: metadata.statusCode }),
-    };
+});
 
-    return entry;
+export type LogContext = {
+  requestId?: string;
+  userId?: string;
+  districtId?: string;
+  resellerId?: string;
+  invoiceId?: string;
+  route?: string;
+  latency?: number;
+  [key: string]: unknown;
+};
+
+class Logger {
+  private baseContext: LogContext = {};
+
+  child(context: LogContext): Logger {
+    const child = new Logger();
+    child.baseContext = { ...this.baseContext, ...context };
+    return child;
   }
 
-  /**
-   * Log debug message
-   */
-  debug(message: string, context?: LogContext): void {
-    this.writeLog(this.createEntry("debug", message, context));
+  private mergeContext(context?: LogContext): Record<string, unknown> {
+    const merged = { ...this.baseContext, ...context };
+    return redact(merged) as Record<string, unknown>;
   }
 
-  /**
-   * Log info message
-   */
   info(message: string, context?: LogContext): void {
-    this.writeLog(this.createEntry("info", message, context));
+    pinoLogger.info(this.mergeContext(context), message);
   }
 
-  /**
-   * Log warning message
-   */
   warn(message: string, context?: LogContext, error?: Error): void {
-    this.writeLog(this.createEntry("warn", message, context, error));
-  }
-
-  /**
-   * Log error message
-   */
-  error(message: string, context?: LogContext, error?: Error): void {
-    this.writeLog(this.createEntry("error", message, context, error));
-  }
-
-  /**
-   * Log API request
-   */
-  logRequest(
-    method: string,
-    path: string,
-    statusCode: number,
-    duration: number,
-    context?: LogContext
-  ): void {
-    const level: LogLevel = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
-    this.writeLog(
-      this.createEntry(
-        level,
-        `${method} ${path} ${statusCode}`,
-        context,
-        undefined,
-        duration,
-        { method, path, statusCode }
-      )
-    );
-  }
-
-  /**
-   * Log database query (optional, for debugging)
-   */
-  logQuery(query: string, duration: number, context?: LogContext): void {
-    if (this.isDevelopment && this.shouldLog("debug")) {
-      this.writeLog(
-        this.createEntry("debug", `DB Query: ${query}`, context, undefined, duration)
-      );
+    const ctx = this.mergeContext(context);
+    if (error) {
+      ctx.error = { name: error.name, message: error.message };
     }
+    pinoLogger.warn(ctx, message);
+  }
+
+  error(message: string, context?: LogContext, error?: Error): void {
+    const ctx = this.mergeContext(context);
+    if (error) {
+      ctx.error = { name: error.name, message: error.message, stack: error.stack };
+    }
+    pinoLogger.error(ctx, message);
+  }
+
+  debug(message: string, context?: LogContext): void {
+    pinoLogger.debug(this.mergeContext(context), message);
   }
 }
 
-// Export singleton instance
 export const logger = new Logger();
 
+/** Create logger with request context (requestId, route, etc.) */
+export function createRequestLogger(context: LogContext): Logger {
+  return logger.child(context);
+}

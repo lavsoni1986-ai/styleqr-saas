@@ -304,13 +304,13 @@ export default function ShiftsContent({ restaurantId }: ShiftsContentProps) {
       {/* Open Shift Modal */}
       {isOpenModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-xl font-bold text-slate-900">Open Shift</h2>
+          <div className="dark-theme-inputs bg-[#0B0F14] border border-gray-800 rounded-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white">Open Shift</h2>
             </div>
             <form onSubmit={handleOpenShift} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">
+                <label className="block text-sm font-semibold text-white mb-2">
                   Opening Cash (₹)
                 </label>
                 <input
@@ -319,10 +319,10 @@ export default function ShiftsContent({ restaurantId }: ShiftsContentProps) {
                   min="0"
                   value={openingCash}
                   onChange={(e) => setOpeningCash(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="input-dark w-full px-4 py-2"
                   required
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Enter the amount of cash in the drawer at shift start
                 </p>
               </div>
@@ -333,14 +333,14 @@ export default function ShiftsContent({ restaurantId }: ShiftsContentProps) {
                     setIsOpenModalOpen(false);
                     setOpeningCash("0");
                   }}
-                  className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition-colors"
+                  className="flex-1 px-4 py-2 btn-secondary-admin"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={updating}
-                  className="flex-1 px-4 py-2 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 btn-primary-admin disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {updating ? (
                     <>
@@ -360,25 +360,25 @@ export default function ShiftsContent({ restaurantId }: ShiftsContentProps) {
       {/* Close Shift Modal */}
       {isCloseModalOpen && selectedShift && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-xl font-bold text-slate-900">Close Shift</h2>
+          <div className="dark-theme-inputs bg-[#0B0F14] border border-gray-800 rounded-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white">Close Shift</h2>
             </div>
             <form onSubmit={handleCloseShift} className="p-6 space-y-4">
-              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+              <div className="bg-[#1A1F26] border border-gray-800 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Opening Cash:</span>
-                  <span className="font-semibold">₹{selectedShift.openingCash.toFixed(2)}</span>
+                  <span className="text-gray-400">Opening Cash:</span>
+                  <span className="font-semibold text-white">₹{selectedShift.openingCash.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Expected Cash:</span>
-                  <span className="font-semibold">
+                  <span className="text-gray-400">Expected Cash:</span>
+                  <span className="font-semibold text-white">
                     ₹{selectedShift.expectedCash?.toFixed(2) || "0.00"}
                   </span>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">
+                <label className="block text-sm font-semibold text-white mb-2">
                   Actual Cash Count (₹)
                 </label>
                 <input
@@ -387,10 +387,10 @@ export default function ShiftsContent({ restaurantId }: ShiftsContentProps) {
                   min="0"
                   value={actualCash}
                   onChange={(e) => setActualCash(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="input-dark w-full px-4 py-2"
                   required
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Count the actual cash in the drawer
                 </p>
               </div>
@@ -402,14 +402,14 @@ export default function ShiftsContent({ restaurantId }: ShiftsContentProps) {
                     setSelectedShift(null);
                     setActualCash("");
                   }}
-                  className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition-colors"
+                  className="flex-1 px-4 py-2 btn-secondary-admin"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={updating}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {updating ? (
                     <>

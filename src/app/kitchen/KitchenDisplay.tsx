@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { Clock, Utensils, CheckCircle, ChefHat, AlertCircle, RefreshCw } from "lucide-react";
+import { getCloudinaryThumbnail } from "@/lib/cloudinary";
 
 // Detect test mode for faster E2E tests
 const isTestMode = typeof window !== 'undefined' && (
@@ -74,8 +75,8 @@ export default function KitchenDisplay({ restaurantId, restaurantName }: Kitchen
 
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.3);
-      } catch (err) {
-        console.warn("Could not play alert sound:", err);
+      } catch {
+        // Alert sound failed (e.g. autoplay blocked) - silent fail
       }
     }
   }, []);
@@ -429,8 +430,8 @@ function OrderCard({
               {item.image && (
                 <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
                   <Image
-                    src={item.image}
-                    alt={item.name}
+                    src={getCloudinaryThumbnail(item.image, { width: 96, height: 96 })}
+                    alt={item.name || "Order item"}
                     fill
                     className="object-cover"
                     sizes="48px"

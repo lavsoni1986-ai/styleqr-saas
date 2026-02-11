@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { requireDistrictAdmin, getUserDistrict } from "@/lib/auth";
+import { getUserDistrict } from "@/lib/auth";
+import { requireDistrictAdmin } from "@/lib/require-role";
 import PartnerManagement from "@/components/district/PartnerManagement";
 
 export const dynamic = "force-dynamic";

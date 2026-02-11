@@ -6,6 +6,7 @@ import { PaymentMethod } from "@prisma/client";
 import { offlineQueue } from "@/lib/offline/queue.engine";
 import { networkMonitor } from "@/lib/offline/network.monitor";
 import { logPayment, logError } from "@/lib/observability/logger";
+import CashfreeButton from "./CashfreeButton";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -182,12 +183,12 @@ export default function PaymentModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="payment-modal-title"
-        className="flex flex-col bg-white w-full max-md:max-h-[90vh] max-md:rounded-t-3xl max-md:rounded-b-none md:max-w-[480px] md:rounded-2xl md:max-h-[85vh] shadow-xl overflow-hidden"
+        className="dark-modal flex flex-col bg-[#0B0F14] w-full max-md:max-h-[90vh] max-md:rounded-t-3xl max-md:rounded-b-none md:max-w-[480px] md:rounded-2xl md:max-h-[85vh] shadow-xl overflow-hidden border border-gray-800"
         onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0" noValidate>
           {/* Header — sticky */}
-          <header className="flex-shrink-0 border-b border-slate-200 bg-white">
+          <header className="flex-shrink-0 border-b border-gray-800 bg-[#0B0F14]">
             {/* Mobile: swipe-down handle */}
             <div
               className="md:hidden flex justify-center pt-3 pb-1"
@@ -197,26 +198,26 @@ export default function PaymentModal({
               onTouchEnd={handleSwipeClose}
               aria-hidden
             >
-              <div className="w-12 h-1.5 rounded-full bg-slate-300" />
+              <div className="w-12 h-1.5 rounded-full bg-gray-600" />
             </div>
             <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-2">
               <div>
-                <h2 id="payment-modal-title" className="text-lg font-bold text-slate-900">
+                <h2 id="payment-modal-title" className="text-lg font-bold text-white">
                   Bill #{bill.billNumber}
                 </h2>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm">
-                  <span className="text-slate-600">Total <strong className="text-slate-900">₹{bill.total.toFixed(2)}</strong></span>
-                  <span className="text-slate-600">Paid <strong className="text-emerald-600">₹{bill.paidAmount.toFixed(2)}</strong></span>
-                  <span className="text-slate-600">Balance <strong className="text-orange-600">₹{balance.toFixed(2)}</strong></span>
+                  <span className="text-gray-400">Total <strong className="text-white">₹{bill.total.toFixed(2)}</strong></span>
+                  <span className="text-gray-400">Paid <strong className="text-emerald-400">₹{bill.paidAmount.toFixed(2)}</strong></span>
+                  <span className="text-gray-400">Balance <strong className="text-amber-500">₹{balance.toFixed(2)}</strong></span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-shrink-0 p-3 -m-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors touch-manipulation"
+                className="flex-shrink-0 p-3 -m-2 rounded-xl hover:bg-gray-800 active:bg-gray-700 transition-colors touch-manipulation text-gray-400 hover:text-white"
                 aria-label="Close"
               >
-                <X className="h-6 w-6 text-slate-600" />
+                <X className="h-6 w-6" />
               </button>
             </div>
           </header>
@@ -225,7 +226,7 @@ export default function PaymentModal({
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5">
             {/* Payment method grid (2x2) */}
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-slate-700 mb-3">Payment method</label>
+              <label className="block text-sm font-semibold text-white mb-3">Payment method</label>
               <div className="grid grid-cols-2 gap-3">
                 {paymentMethods.map((pm) => {
                   const Icon = pm.icon;
@@ -240,12 +241,12 @@ export default function PaymentModal({
                       }}
                       className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all touch-manipulation ${
                         selected
-                          ? "border-orange-500 bg-orange-50 shadow-sm"
-                          : "border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-100"
+                          ? "border-amber-500 bg-amber-500/20"
+                          : "border-gray-800 bg-[#1A1F26] hover:border-gray-700 hover:bg-gray-800/50"
                       }`}
                     >
-                      <Icon className={`h-7 w-7 ${selected ? "text-orange-600" : "text-slate-500"}`} />
-                      <span className={`text-sm font-semibold ${selected ? "text-orange-700" : "text-slate-700"}`}>
+                      <Icon className={`h-7 w-7 ${selected ? "text-amber-500" : "text-gray-500"}`} />
+                      <span className={`text-sm font-semibold ${selected ? "text-amber-400" : "text-gray-400"}`}>
                         {pm.label}
                       </span>
                     </button>
@@ -256,9 +257,9 @@ export default function PaymentModal({
 
             {/* Amount with ₹ prefix */}
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
-              <div className="flex items-center border-2 border-slate-200 rounded-xl overflow-hidden focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-shadow">
-                <span className="pl-4 text-slate-500 font-semibold text-lg">₹</span>
+              <label className="block text-sm font-semibold text-white mb-2">Amount</label>
+              <div className="flex items-center bg-[#1A1F26] border-2 border-gray-800 rounded-xl overflow-hidden focus-within:border-amber-500/50 focus-within:ring-2 focus-within:ring-amber-500/20 transition-shadow">
+                <span className="pl-4 text-gray-500 font-semibold text-lg">₹</span>
                 <input
                   type="number"
                   step="0.01"
@@ -266,7 +267,7 @@ export default function PaymentModal({
                   max={balance}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="flex-1 py-3.5 pr-4 border-0 focus:ring-0 text-lg font-semibold text-slate-900 placeholder:text-slate-400"
+                  className="flex-1 py-3.5 pr-4 border-0 bg-transparent focus:ring-0 text-lg font-semibold text-white placeholder:text-gray-500"
                   placeholder="0.00"
                   required
                 />
@@ -280,7 +281,7 @@ export default function PaymentModal({
                     onClick={() =>
                       setAmount(p < 100 ? (balance * (p / 100)).toFixed(2) : balance.toFixed(2))
                     }
-                    className="py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold text-sm transition-colors touch-manipulation"
+                    className="py-2.5 rounded-xl bg-[#1A1F26] border border-gray-800 hover:bg-gray-800 hover:border-gray-700 active:bg-gray-700 text-gray-300 font-semibold text-sm transition-colors touch-manipulation"
                   >
                     {p === 100 ? "Full" : `${p}%`}
                   </button>
@@ -288,50 +289,71 @@ export default function PaymentModal({
               </div>
             </div>
 
-            {/* Reference (for non-cash) */}
+            {/* Cashfree online checkout (UPI / CARD / QR) */}
             {method !== "CASH" && (
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  {method === "UPI" && "UPI Transaction ID"}
-                  {method === "CARD" && "Card Transaction ID"}
-                  {method === "QR" && "QR Transaction ID"}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-px flex-1 bg-gray-800" />
+                  <span className="text-xs text-gray-500 uppercase tracking-wider">or</span>
+                  <div className="h-px flex-1 bg-gray-800" />
+                </div>
+                <CashfreeButton
+                  billId={bill.id}
+                  amount={amountNum}
+                  onSuccess={() => {
+                    onPaymentSuccess();
+                    onClose();
+                  }}
+                  onError={setError}
+                  disabled={amountNum <= 0 || amountNum > balance + 0.01}
+                  className="w-full py-3.5 bg-amber-500/20 border-2 border-amber-500/50 text-amber-400 font-semibold rounded-xl hover:bg-amber-500/30 hover:border-amber-500/70 transition-colors flex items-center justify-center gap-2"
+                />
+              </div>
+            )}
+
+            {/* Reference (for non-cash, manual entry) */}
+            {method !== "CASH" && (
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-white mb-2">
+                  {method === "UPI" && "UPI Transaction ID (manual)"}
+                  {method === "CARD" && "Card Transaction ID (manual)"}
+                  {method === "QR" && "QR Transaction ID (manual)"}
                 </label>
                 <input
                   type="text"
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  placeholder="Enter transaction reference..."
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-colors"
-                  required
+                  placeholder="Enter transaction reference if paid offline..."
+                  className="w-full px-4 py-3 bg-[#1A1F26] border-2 border-gray-800 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 text-white placeholder:text-gray-500 outline-none transition-colors"
                 />
               </div>
             )}
 
             {/* Notes (optional) */}
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Notes (optional)</label>
+              <label className="block text-sm font-semibold text-white mb-2">Notes (optional)</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Additional notes..."
                 rows={2}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none resize-none transition-colors"
+                className="w-full px-4 py-3 bg-[#1A1F26] border-2 border-gray-800 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 text-white placeholder:text-gray-500 outline-none resize-none transition-colors"
               />
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
+              <div className="p-3 bg-red-950/50 border border-red-800 rounded-xl text-red-300 text-sm">
                 {error}
               </div>
             )}
           </div>
 
           {/* Footer — sticky, big primary PAY button */}
-          <footer className="flex-shrink-0 border-t border-slate-200 bg-white p-4 safe-area-inset-bottom">
+          <footer className="flex-shrink-0 border-t border-gray-800 bg-[#0B0F14] p-4 safe-area-inset-bottom">
             <button
               type="submit"
               disabled={loading || amountNum <= 0 || amountNum > balance + 0.01}
-              className="w-full py-4 bg-orange-600 text-white font-bold text-lg rounded-xl hover:bg-orange-700 active:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors touch-manipulation shadow-lg shadow-orange-900/20"
+              className="w-full py-4 bg-amber-500 text-zinc-950 font-bold text-lg rounded-xl hover:bg-amber-400 active:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors touch-manipulation shadow-lg shadow-amber-900/20"
             >
               {loading ? (
                 <>

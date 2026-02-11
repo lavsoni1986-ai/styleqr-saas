@@ -6,7 +6,7 @@
 import type { PaymentProvider } from "./payment.provider";
 import type { PaymentIntent, PaymentResult, RefundRequest, RefundResult, SettlementData, PaymentMetadata } from "./payment.provider";
 import { RazorpayProvider } from "./razorpay.provider";
-import { StripeProvider } from "./stripe.provider";
+import { CashfreeProvider } from "./cashfree.provider";
 import { MockProvider } from "./mock.provider";
 import { offlineQueue } from "@/lib/offline/queue.engine";
 import { networkMonitor } from "@/lib/offline/network.monitor";
@@ -70,9 +70,9 @@ export class PaymentService {
             webhookSecret: gateway.webhookSecret,
           });
 
-        case "stripe":
-          return new StripeProvider({
-            publishableKey: gateway.keyId || "",
+        case "cashfree":
+          return new CashfreeProvider({
+            appId: gateway.keyId || "",
             secretKey: gateway.keySecret || "",
             webhookSecret: gateway.webhookSecret,
           });

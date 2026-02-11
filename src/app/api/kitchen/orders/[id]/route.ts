@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant, requireRestaurantOwner } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireRestaurantOwner } from "@/lib/require-role";
 import { processOrderCommission } from "@/lib/commission.server";
 import { createBillFromOrder } from "@/lib/billing.server";
 import { isTestMode, logTestMode } from "@/lib/test-mode";
@@ -161,36 +162,16 @@ export async function PATCH(
       if (status === "SERVED") {
         // Process commission (non-blocking, failures don't block order update)
         try {
-          const commissionResult = await processOrderCommission(updatedOrder.id);
-          if (process.env.NODE_ENV === "development") {
-            if (commissionResult.success && commissionResult.commissionId) {
-              console.log(`Commission calculated for order ${updatedOrder.id}: ${commissionResult.commissionId}`);
-            } else if (commissionResult.error) {
-              console.warn(`Commission calculation failed for order ${updatedOrder.id}: ${commissionResult.error}`);
-            }
-          }
-        } catch (commissionError) {
-          // Silent in production - commission failure doesn't block order completion
-          if (process.env.NODE_ENV === "development") {
-            console.error("Error processing commission:", commissionError);
-          }
+          await processOrderCommission(updatedOrder.id);
+        } catch {
+          // Silent - commission failure doesn't block order completion
         }
 
         // Create bill from order (non-blocking, failures don't block order update)
         try {
-          const billResult = await createBillFromOrder(updatedOrder.id);
-          if (process.env.NODE_ENV === "development") {
-            if (billResult.success && billResult.billId) {
-              console.log(`Bill created for order ${updatedOrder.id}: ${billResult.billId}`);
-            } else if (billResult.error) {
-              console.warn(`Bill creation failed for order ${updatedOrder.id}: ${billResult.error}`);
-            }
-          }
-        } catch (billError) {
-          // Silent in production - bill creation failure doesn't block order completion
-          if (process.env.NODE_ENV === "development") {
-            console.error("Error creating bill from order:", billError);
-          }
+          await createBillFromOrder(updatedOrder.id);
+        } catch {
+          // Silent - bill creation failure doesn't block order completion
         }
       }
 

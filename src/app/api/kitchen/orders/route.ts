@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant, requireRestaurantOwner } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireRestaurantOwner } from "@/lib/require-role";
 import { isTestMode, testMockData, logTestMode } from "@/lib/test-mode";
 
 export const dynamic = "force-dynamic";

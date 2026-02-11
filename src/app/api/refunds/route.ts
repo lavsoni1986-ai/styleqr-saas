@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 import { removePaymentsFromSettlement } from "@/lib/settlement.server";
 import { isTestMode, logTestMode } from "@/lib/test-mode";
 
@@ -17,12 +17,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ refunds: [] }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -90,12 +90,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, refundId: "test-refund", amount: 0, status: "SUCCEEDED" }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         status: "SUCCEEDED",
         reason: reason || null,
         succeededAt: new Date(),
-        requestedBy: session.id,
+        requestedBy: user.id,
       },
     });
 

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { requirePartner, getUserPartner } from "@/lib/auth";
+import { getUserPartner } from "@/lib/auth";
+import { requirePartner } from "@/lib/require-role";
 import { prisma } from "@/lib/prisma.server";
 import CommissionReports from "@/components/partner/CommissionReports";
 

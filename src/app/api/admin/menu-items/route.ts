@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { buildTenantWhere, resolveRestaurantIdForAdmin, applyHostScope } from "@/lib/rbac-helpers";
+import { getDistrictIdFromHost } from "@/lib/get-district-from-host";
 import { isTestMode, testMockData, logTestMode } from "@/lib/test-mode";
+import { createAuditLog } from "@/lib/audit-log";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     // Test mode short-circuit for fast E2E tests
     if (isTestMode) {
@@ -12,22 +20,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(testMockData.menuItems, { status: 200 });
     }
 
-    // Check authentication
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
+
+    const { userForScope } = await resolveRestaurantIdForAdmin(authUser);
+    if ((authUser.role === "RESTAURANT_ADMIN" || authUser.role === "RESTAURANT_OWNER") && !userForScope.restaurantId) {
+      return NextResponse.json({ error: "User not linked to a restaurant" }, { status: 403 });
     }
 
-    // Get user's restaurant
-    const restaurant = await getUserRestaurant(session.id);
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
+    // CRITICAL: Get user's districtId for host scope enforcement
+    let userDistrictId: string | null = null;
+    if ((authUser.role === "RESTAURANT_ADMIN" || authUser.role === "RESTAURANT_OWNER") && userForScope.restaurantId) {
+      const restaurant = await prisma.restaurant.findUnique({
+        where: { id: userForScope.restaurantId },
+        select: { districtId: true },
+      });
+      userDistrictId = restaurant?.districtId || null;
+    } else if (authUser.role === "DISTRICT_ADMIN") {
+      const district = await prisma.district.findFirst({
+        where: { adminId: authUser.id },
+        select: { id: true },
+      });
+      userDistrictId = district?.id || null;
     }
+    await applyHostScope(userForScope, userDistrictId);
 
-    const restaurantId = restaurant.id;
+    const hostDistrictId = await getDistrictIdFromHost();
+    const where = buildTenantWhere(userForScope, {}, hostDistrictId, "restaurant_scoped");
 
     const categories = await prisma.category.findMany({
-      where: { restaurantId },
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         items: {
@@ -38,26 +63,29 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(Array.isArray(categories) ? categories : []);
   } catch (error) {
-    console.error("Admin menu-items GET error:", error);
+    // Production-safe: Only log in development
+    if (process.env.NODE_ENV === "development") {
+      console.error("Admin menu-items GET error:", error);
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.admin);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
-    // Check authentication
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
+    // RBAC: Require SUPER_ADMIN, RESTAURANT_ADMIN, or RESTAURANT_OWNER
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN", "RESTAURANT_ADMIN", "RESTAURANT_OWNER"]);
+    if (guardError) return guardError;
+    const authUser = user!;
 
-    // Get user's restaurant
-    const restaurant = await getUserRestaurant(session.id);
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
+    const { restaurantId } = await resolveRestaurantIdForAdmin(authUser);
+    if (!restaurantId) {
+      return NextResponse.json({ error: "Restaurant ID required. User is not linked to a restaurant." }, { status: 403 });
     }
-
-    const restaurantId = restaurant.id;
 
     let body: unknown;
     try {
@@ -95,11 +123,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "categoryId is required" }, { status: 400 });
     }
 
-    // Verify category belongs to restaurant
+    // Verify category belongs to restaurant (tenant isolation)
     const category = await prisma.category.findFirst({
       where: { 
         id: safeCategoryId, 
-        restaurantId 
+        restaurantId: restaurantId 
       },
     });
 
@@ -122,10 +150,31 @@ export async function POST(request: NextRequest) {
             select: {
               id: true,
               name: true,
+              restaurantId: true,
+              restaurant: {
+                select: {
+                  districtId: true,
+                },
+              },
             },
           },
         },
       });
+
+      // Audit log: MENU_ITEM_CREATED
+      const districtId = menuItem.category.restaurant?.districtId;
+      if (districtId) {
+        await createAuditLog({
+          districtId,
+          userId: authUser.id,
+          userRole: authUser.role,
+          action: "MENU_ITEM_CREATED",
+          entityType: "MenuItem",
+          entityId: menuItem.id,
+          metadata: { name: menuItem.name, price: menuItem.price, categoryId: menuItem.categoryId },
+          request,
+        });
+      }
 
       return NextResponse.json(menuItem, { status: 201 });
     } catch (prismaError) {
@@ -143,7 +192,10 @@ export async function POST(request: NextRequest) {
       throw prismaError;
     }
   } catch (error) {
-    console.error("Admin menu-items POST error:", error);
+    // Production-safe: Only log in development
+    if (process.env.NODE_ENV === "development") {
+      console.error("Admin menu-items POST error:", error);
+    }
     
     if (error instanceof Error) {
       return NextResponse.json(

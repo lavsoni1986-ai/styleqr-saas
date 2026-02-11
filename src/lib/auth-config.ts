@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.server";
 import { verifyPassword } from "../lib/auth";
 import { Role } from "@prisma/client";
 import { getEnv, getOptionalEnv } from "../lib/env-validation";
+import { logger } from "../lib/logger";
 
 /**
  * NextAuth Configuration
@@ -11,6 +12,7 @@ import { getEnv, getOptionalEnv } from "../lib/env-validation";
  */
 
 export const authOptions: NextAuthConfig = {
+  trustHost: true, // Required for production domain (e.g. https://stylerqrestaurant.in) and Railway
   providers: [
     Credentials({
       name: "Credentials",
@@ -40,6 +42,8 @@ export const authOptions: NextAuthConfig = {
             name: true,
             password: true,
             role: true,
+            restaurantId: true,
+            districtId: true,
           },
         });
 
@@ -63,6 +67,8 @@ export const authOptions: NextAuthConfig = {
           email: user.email,
           name: user.name,
           role: user.role,
+          restaurantId: user.restaurantId || undefined,
+          districtId: user.districtId || undefined,
         };
       },
     }),
@@ -79,7 +85,38 @@ export const authOptions: NextAuthConfig = {
         token.email = user.email;
         token.name = user.name;
         token.role = user.role;
+        token.restaurantId = (user as { restaurantId?: string }).restaurantId;
+        token.districtId = (user as { districtId?: string }).districtId;
       }
+      
+      // CRITICAL: JWT Freshness - Fetch fresh role from DB on every request
+      // Prevents stale privilege retention if role changes in database
+      // This ensures role changes take effect immediately, not after token expiry
+      if (token?.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { 
+              role: true, 
+              restaurantId: true, 
+              districtId: true 
+            },
+          });
+
+          if (dbUser) {
+            // Update token with fresh role and tenant IDs from database
+            token.role = dbUser.role;
+            token.restaurantId = dbUser.restaurantId || undefined;
+            token.districtId = dbUser.districtId || undefined;
+          }
+          // Note: If user deleted, keep existing token values
+          // The session check will fail on next request when user is not found
+          // This prevents token invalidation issues while maintaining security
+        } catch (error) {
+          logger.error("Error fetching fresh user role", { userId: token.id }, error instanceof Error ? error : undefined);
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {
@@ -88,6 +125,8 @@ export const authOptions: NextAuthConfig = {
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
         session.user.role = token.role as Role;
+        session.user.restaurantId = token.restaurantId as string | undefined;
+        session.user.districtId = token.districtId as string | undefined;
       }
       return session;
     },

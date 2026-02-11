@@ -1,94 +1,108 @@
 /**
  * Environment Variable Validation
- * Validates required environment variables at startup
- * Provides safe defaults where appropriate
- * 
- * Railway Build Compatibility:
- * - Set SKIP_ENV_VALIDATION=true during build to bypass validation
- * - Runtime validation still enforced when SKIP_ENV_VALIDATION is not set
+ * Fail-fast: App must not start if required vars are missing.
+ *
+ * Railway Build: Set SKIP_ENV_VALIDATION=true during build to bypass.
+ * Runtime: Validation enforced when SKIP_ENV_VALIDATION is not set.
  */
+
+import { logger } from "./logger";
 
 const SKIP_VALIDATION = process.env.SKIP_ENV_VALIDATION === "true";
 
-const requiredEnvVars = {
-  DATABASE_URL: process.env.DATABASE_URL,
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000",
-};
+const REQUIRED_FINANCIAL_ENV = [
+  "CASHFREE_APP_ID",
+  "CASHFREE_SECRET_KEY",
+] as const;
 
-const optionalEnvVars = {
-  NODE_ENV: process.env.NODE_ENV || "development",
-  PRISMA_QUERY_LOG: process.env.PRISMA_QUERY_LOG === "true",
-};
+const REQUIRED_CORE_ENV = [
+  "DATABASE_URL",
+  "NEXTAUTH_SECRET",
+  "INTERNAL_API_SECRET",
+] as const;
+
+const REQUIRED_ENV = [
+  ...REQUIRED_CORE_ENV,
+  ...REQUIRED_FINANCIAL_ENV,
+] as const;
+
+function getValue(key: string): string {
+  const v = process.env[key];
+  return typeof v === "string" ? v.trim() : "";
+}
 
 /**
- * Validate required environment variables
- * Throws error if critical vars are missing (unless SKIP_ENV_VALIDATION=true)
+ * Validate all required environment variables.
+ * Throws if any are missing (unless SKIP_ENV_VALIDATION=true).
  */
 export function validateEnv(): void {
-  // Skip validation during build (Railway compatibility)
-  if (SKIP_VALIDATION) {
-    return;
-  }
+  if (SKIP_VALIDATION) return;
 
   const missing: string[] = [];
-
-  for (const [key, value] of Object.entries(requiredEnvVars)) {
-    if (!value || value.trim() === "") {
-      missing.push(key);
-    }
+  for (const key of REQUIRED_ENV) {
+    if (!getValue(key)) missing.push(key);
   }
 
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missing.join(", ")}\n` +
-      "Please check your .env file or deployment configuration."
+        "Set them in .env or deployment configuration. " +
+        "Use SKIP_ENV_VALIDATION=true only during build."
     );
   }
 }
 
 /**
- * Get validated environment variable
- * Returns value or throws if missing (unless SKIP_ENV_VALIDATION=true)
- * During build, returns empty string if SKIP_ENV_VALIDATION is set
+ * Get validated env var (throws if missing, unless SKIP).
  */
-export function getEnv(key: keyof typeof requiredEnvVars): string {
-  // Skip validation during build (Railway compatibility)
+export function getEnv(key: (typeof REQUIRED_ENV)[number]): string {
   if (SKIP_VALIDATION) {
-    const value = requiredEnvVars[key];
-    // Return empty string during build, but log warning
-    if (!value || value.trim() === "") {
-      console.warn(`[ENV] Skipping validation for ${key} (SKIP_ENV_VALIDATION=true)`);
-      return "";
-    }
-    return value;
+    const v = getValue(key);
+    if (!v) logger.warn("[ENV] Skipping validation", { key, reason: "SKIP_ENV_VALIDATION=true" });
+    return v;
   }
-
-  const value = requiredEnvVars[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
+  const v = getValue(key);
+  if (!v) throw new Error(`Missing required environment variable: ${key}`);
+  return v;
 }
 
-/**
- * Get optional environment variable with default
- */
-export function getOptionalEnv(key: keyof typeof optionalEnvVars): string | boolean {
-  return optionalEnvVars[key];
+/** Optional env vars with defaults (not validated). */
+export function getOptionalEnv(
+  key: "NODE_ENV" | "NEXTAUTH_URL" | "PRISMA_QUERY_LOG"
+): string | boolean {
+  if (key === "NEXTAUTH_URL") {
+    return process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
+  }
+  if (key === "NODE_ENV") return process.env.NODE_ENV || "development";
+  if (key === "PRISMA_QUERY_LOG") return process.env.PRISMA_QUERY_LOG === "true";
+  return "";
 }
 
 // Validate on module load (server-side only)
-// Skip validation during build if SKIP_ENV_VALIDATION is set
+// SENTRY_DSN optional in dev; required in production
+const REQUIRED_PROD_ENV = ["SENTRY_DSN"] as const;
+
 if (typeof window === "undefined" && !SKIP_VALIDATION) {
   try {
     validateEnv();
+    if (process.env.NODE_ENV === "production") {
+      for (const key of REQUIRED_PROD_ENV) {
+        const v = process.env[key];
+        if (!v || typeof v !== "string" || v.trim() === "") {
+          throw new Error(`Missing required production env: ${key}`);
+        }
+      }
+    }
   } catch (error) {
-    // Only throw in production - allow development to continue with warnings
     if (process.env.NODE_ENV === "production") {
       throw error;
     }
-    console.warn("[ENV] Environment validation warning:", error instanceof Error ? error.message : String(error));
+    logger.warn(
+      "[ENV] Validation warning",
+      { message: error instanceof Error ? error.message : String(error) },
+      error instanceof Error ? error : undefined
+    );
   }
 }
-

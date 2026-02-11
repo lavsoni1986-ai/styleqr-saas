@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 import { BillStatus, PaymentMethod } from "@prisma/client";
 import { isTestMode, testMockData, logTestMode } from "@/lib/test-mode";
+import { createRequestLogger } from "@/lib/logger";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
+import { betaLogFinancial } from "@/lib/beta-mode";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/billing
  * Get all bills for restaurant (with filters)
+ * Rate limited: 30 requests per minute per IP.
  */
 export async function GET(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.billing);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     // Test mode short-circuit for fast E2E tests
     if (isTestMode) {
@@ -18,15 +25,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ bills: testMockData.bills }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
+
+    betaLogFinancial("billing/GET", { restaurantId: restaurant.id });
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") as BillStatus | null;
@@ -91,7 +100,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ bills }, { status: 200 });
   } catch (error) {
-    console.error("Billing GET error:", error);
+    const reqLogger = createRequestLogger({
+      requestId: request.headers.get("x-request-id") ?? undefined,
+      route: "/api/billing",
+    });
+    reqLogger.error("Billing GET error", {}, error instanceof Error ? error : undefined);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -99,15 +112,19 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/billing
  * Create a new bill (OPEN status)
+ * Rate limited: 30 requests per minute per IP.
  */
 export async function POST(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.billing);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -149,7 +166,20 @@ export async function POST(request: NextRequest) {
     const newBillNumber = billSequence.lastBillNumber + 1;
     const billNumber = `BILL-${currentYear}-${String(newBillNumber).padStart(6, "0")}`;
 
-    // Calculate totals
+    // Batch fetch menu items (no N+1)
+    const menuItemIds = [...new Set(items.map((i) => i.menuItemId))];
+    const menuItems =
+      menuItemIds.length > 0
+        ? await prisma.menuItem.findMany({
+            where: {
+              id: { in: menuItemIds },
+              category: { restaurantId: restaurant.id },
+            },
+            select: { id: true, name: true, price: true },
+          })
+        : [];
+    const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
+
     let subtotal = 0;
     const billItemsData: Array<{
       menuItemId: string | null;
@@ -163,10 +193,7 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const item of items) {
-      const menuItem = await prisma.menuItem.findUnique({
-        where: { id: item.menuItemId },
-      });
-
+      const menuItem = menuItemMap.get(item.menuItemId);
       if (!menuItem) {
         return NextResponse.json(
           { error: `Menu item ${item.menuItemId} not found` },
@@ -251,7 +278,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ bill }, { status: 201 });
   } catch (error) {
-    console.error("Billing POST error:", error);
+    const reqLogger = createRequestLogger({
+      requestId: request.headers.get("x-request-id") ?? undefined,
+      route: "/api/billing",
+    });
+    reqLogger.error("Billing POST error", {}, error instanceof Error ? error : undefined);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

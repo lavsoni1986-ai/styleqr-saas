@@ -12,7 +12,8 @@ model User {
   email         String       @unique
   name          String?
   password      String?
-  role          Role         @default(RESTAURANT_OWNER)
+  role          Role         @default(RESTAURANT_ADMIN)
+  restaurantId  String?
   districtId    String?
   partnerId     String?
   createdAt     DateTime     @default(now())
@@ -21,33 +22,88 @@ model User {
   ownedDistrict District?    @relation("DistrictAdmin")
   ownedPartner  Partner?     @relation("PartnerOwner")
   restaurants   Restaurant[]
+  restaurant    Restaurant?   @relation("UserRestaurant", fields: [restaurantId], references: [id])
   shifts        Shift[]
   tips          Tip[]
   district      District?    @relation(fields: [districtId], references: [id])
   partner       Partner?     @relation(fields: [partnerId], references: [id])
   whiteLabels   WhiteLabel[]
+  auditLogs     AuditLog[]
+  npsFeedback   NpsFeedback?
 
+  @@index([restaurantId])
   @@index([districtId])
   @@index([partnerId])
   @@index([role])
 }
 
 model District {
-  id          String       @id @default(uuid())
-  name        String
-  code        String       @unique
-  region      String?
-  adminId     String       @unique
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  admin       User         @relation("DistrictAdmin", fields: [adminId], references: [id], onDelete: Cascade)
-  partners    Partner[]
-  restaurants Restaurant[]
-  users       User[]
-  whiteLabels WhiteLabel[]
+  id                   String             @id @default(uuid())
+  name                 String
+  code                 String              @unique
+  region               String?
+  adminId              String              @unique
+  customDomain         String?             @unique
+  logoUrl              String?
+  primaryColor         String?
+  isActive             Boolean             @default(true)
+  stripeCustomerId     String?             @unique
+  stripeSubscriptionId String?             @unique
+  cfCustomerId         String?
+  cfOrderId            String?             @unique
+  subscriptionStatus   DistrictSubscriptionStatus @default(INACTIVE)
+  currentPeriodEnd     DateTime?
+  planType             PlanType                    @default(BASIC)
+  verificationToken    String?             @unique
+  isDomainVerified     Boolean             @default(false)
+  verificationCheckedAt DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  admin                User                @relation("DistrictAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+  partners             Partner[]
+  restaurants          Restaurant[]
+  users                User[]
+  whiteLabels          WhiteLabel[]
+  auditLogs            AuditLog[]
+  upgradeIntents       UpgradeIntent[]
+  churnSignals         ChurnSignal[]
+  revenueShares        RevenueShare[]
+  resellerId           String?
+  reseller             Reseller?  @relation(fields: [resellerId], references: [id])
 
   @@index([adminId])
   @@index([code])
+  @@index([customDomain])
+  @@index([isActive])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([subscriptionStatus])
+  @@index([isDomainVerified])
+  @@index([planType])
+  @@index([resellerId])
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  districtId      String
+  userId          String?
+  userRole        Role?
+  action          String
+  entityType      String
+  entityId        String?
+  metadata        Json?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+
+  district        District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([districtId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@index([entityType])
 }
 
 model Partner {
@@ -121,6 +177,7 @@ model Restaurant {
   paymentGateways PaymentGateway[]
   district        District?        @relation(fields: [districtId], references: [id])
   owner           User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  adminUsers      User[]           @relation("UserRestaurant")
   partner         Partner?         @relation(fields: [partnerId], references: [id])
   whiteLabel      WhiteLabel?      @relation(fields: [whiteLabelId], references: [id])
   settlements     Settlement[]
@@ -565,6 +622,7 @@ enum OrderType {
 
 enum Role {
   SUPER_ADMIN
+  RESTAURANT_ADMIN
   WHITE_LABEL_ADMIN
   DISTRICT_ADMIN
   PARTNER
@@ -637,4 +695,154 @@ enum BillStatus {
 enum ShiftStatus {
   OPEN
   CLOSED
+}
+
+enum DistrictSubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum PlanType {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+model ChurnSignal {
+  id         String   @id @default(cuid())
+  districtId String
+  riskScore  Float
+  riskLevel  String   // LOW, MEDIUM, HIGH
+  reasons    Json
+  createdAt  DateTime @default(now())
+
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@index([districtId])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model Reseller {
+  id              String        @id @default(cuid())
+  name            String
+  email           String        @unique
+  commissionRate  Float         // e.g. 0.2 = 20%
+  stripeAccountId String?       @unique
+  cfVendorId      String?       @unique
+  createdAt       DateTime      @default(now())
+
+  districts       District[]
+  revenueShares   RevenueShare[]
+
+  @@index([email])
+  @@index([stripeAccountId])
+}
+
+model RevenueShare {
+  id               String   @id @default(cuid())
+  districtId       String
+  resellerId       String
+  invoiceId        String   // Payment/order ID for idempotency (cf_order_id or legacy)
+  amountCents      Int      // Amount in cents
+  commissionCents  Int      // Commission in cents (commissionCents <= amountCents)
+  payoutStatus     String   // PENDING, PAID
+  stripeTransferId String?  @unique
+  cfTransferId     String?  @unique
+  periodStart      DateTime
+  periodEnd        DateTime
+  createdAt        DateTime @default(now())
+
+  district        District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  reseller        Reseller @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@unique([districtId, invoiceId])
+  @@index([resellerId])
+  @@index([districtId])
+  @@index([payoutStatus])
+  @@index([createdAt])
+  @@index([stripeTransferId])
+  @@index([invoiceId])
+}
+
+/// Fail-closed: Stores webhook event IDs for idempotency and failed-event logging.
+/// Cashfree: cfPaymentId. Legacy: stripeEventId.
+/// If processing fails (DB down, etc.), we log here for manual re-sync.
+model WebhookAuditLog {
+  id             String   @id @default(cuid())
+  stripeEventId  String?  @unique
+  cfPaymentId    String?  @unique
+  eventType      String
+  status         String   // PROCESSED | FAILED
+  errorMessage   String?
+  districtId     String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([stripeEventId])
+  @@index([cfPaymentId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model UpgradeIntent {
+  id         String   @id @default(cuid())
+  districtId String
+  planType   PlanType
+  createdAt  DateTime @default(now())
+
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@index([districtId])
+  @@index([planType])
+  @@index([createdAt])
+}
+
+// Beta acquisition: intake leads before manual onboarding
+model BetaLead {
+  id              String         @id @default(uuid())
+  name            String
+  email           String         @unique
+  restaurant      String
+  district        String         // District/region name they want to operate in
+  phone           String?
+  monthlyOrders   Int?           // Estimated monthly order volume
+  status          BetaLeadStatus @default(PENDING)
+  notes           String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  convertedAt     DateTime?
+  districtId      String?        // Set when converted
+  restaurantId    String?        // Set when converted
+  userId          String?        // Set when converted (account created)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([createdAt])
+}
+
+enum BetaLeadStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+// NPS feedback capture after 7 days
+model NpsFeedback {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  score     Int      // 0-10
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }

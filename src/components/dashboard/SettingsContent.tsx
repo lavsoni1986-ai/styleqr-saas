@@ -119,7 +119,7 @@ export default function SettingsContent() {
             type="text"
             value={restaurantName}
             onChange={(e) => setRestaurantName(e.target.value)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+            className="input-dark w-full px-3 py-2"
           />
         </div>
         <div>
@@ -128,7 +128,7 @@ export default function SettingsContent() {
             type="email"
             value={ownerEmail}
             onChange={(e) => setOwnerEmail(e.target.value)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+            className="input-dark w-full px-3 py-2"
           />
         </div>
         <div>

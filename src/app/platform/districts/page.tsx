@@ -1,16 +1,13 @@
-import { redirect } from "next/navigation";
-import { requireSuperAdmin } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { pageGuard } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma.server";
 import DistrictManagement from "@/components/platform/DistrictManagement";
 
 export const dynamic = "force-dynamic";
 
 export default async function DistrictsPage() {
-  try {
-    await requireSuperAdmin();
-  } catch (error) {
-    redirect("/login");
-  }
+  const user = await getAuthUser();
+  pageGuard(user, ["SUPER_ADMIN"]);
 
   const districts = await prisma.district.findMany({
     include: {

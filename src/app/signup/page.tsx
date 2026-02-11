@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { UtensilsCrossed, Loader2 } from "lucide-react";
 
 export default function Signup() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     restaurantName: "",
     ownerName: "",
@@ -27,7 +26,6 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      // Signup endpoint - do not change to /api/auth/login
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,9 +40,21 @@ export default function Signup() {
         return;
       }
 
+      // Sign in with NextAuth to create session
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Account created but sign in failed. Please try logging in.");
+        setLoading(false);
+        return;
+      }
+
       // Redirect to dashboard
-      router.push("/dashboard");
-      router.refresh();
+      window.location.href = "/dashboard";
     } catch (err) {
       setError("Network error. Please try again.");
     } finally {

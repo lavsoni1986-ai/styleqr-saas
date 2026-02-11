@@ -1,5 +1,6 @@
 import nextDynamic from "next/dynamic";
-import { requireRestaurantOwner, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireRestaurantOwner } from "@/lib/require-role";
 
 const KitchenDisplay = nextDynamic(() => import("./KitchenDisplay"), {
   loading: () => (

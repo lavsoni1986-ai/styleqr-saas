@@ -1,8 +1,19 @@
 import { redirect } from "next/navigation";
-import { requireDistrictAdmin, getUserDistrict } from "@/lib/auth";
+import { getUserDistrict } from "@/lib/auth";
+import { requireDistrictAdmin } from "@/lib/require-role";
+import { getUpsellRecommendations } from "@/lib/upsell-engine";
+import { getLatestChurnSignal } from "@/lib/churn-engine";
 import DistrictDashboardContent from "@/components/district/DistrictDashboardContent";
+import DistrictRestrictedState from "@/components/district/DistrictRestrictedState";
+import UpsellBanner from "@/components/UpsellBanner";
+import ChurnWarningBanner from "@/components/admin/ChurnWarningBanner";
+import { prisma } from "@/lib/prisma.server";
 
 export const dynamic = "force-dynamic";
+
+/** Fail-closed: subscription must be ACTIVE and district isActive for full access. */
+const isSubscriptionHealthy = (district: { isActive: boolean; subscriptionStatus: string }) =>
+  district.isActive && district.subscriptionStatus === "ACTIVE";
 
 export default async function DistrictPage() {
   let user;
@@ -24,7 +35,16 @@ export default async function DistrictPage() {
     );
   }
 
-  // Load district stats
+  // Fail-closed: restricted state when subscription inactive or webhook unhealthy
+  if (!isSubscriptionHealthy(district)) {
+    return (
+      <div className="p-6">
+        <DistrictRestrictedState district={district} />
+      </div>
+    );
+  }
+
+  // RLS-like: all queries explicitly scoped by districtId
   const [
     partnersCount,
     restaurantsCount,
@@ -33,31 +53,21 @@ export default async function DistrictPage() {
   ] = await Promise.all([
     district.partners.length,
     district.restaurants.length,
-    // Count orders from district restaurants
-    import("@/lib/prisma.server").then(({ prisma }) =>
-      prisma.order.count({
-        where: {
-          restaurantId: {
-            in: district.restaurants.map((r) => r.id),
-          },
-          status: "SERVED",
-        },
-      })
-    ),
-    // Calculate revenue from commissions
-    import("@/lib/prisma.server").then(({ prisma }) =>
-      prisma.commission.aggregate({
-        where: {
-          partnerId: {
-            in: district.partners.map((p) => p.id),
-          },
-          status: "PAID",
-        },
-        _sum: {
-          amount: true,
-        },
-      })
-    ),
+    // M02: Order isolation via restaurant.districtId
+    prisma.order.count({
+      where: {
+        restaurant: { districtId: district.id },
+        status: "SERVED",
+      },
+    }),
+    // M04: Commission isolation via partner.districtId
+    prisma.commission.aggregate({
+      where: {
+        partner: { districtId: district.id },
+        status: "PAID",
+      },
+      _sum: { amount: true },
+    }),
   ]);
 
   const totalRevenueAmount = totalRevenue?._sum?.amount ?? 0;
@@ -69,8 +79,28 @@ export default async function DistrictPage() {
     revenue: totalRevenueAmount,
   };
 
+  // Get upsell recommendations and churn signal
+  const [upsellRecommendations, churnSignal] = await Promise.all([
+    getUpsellRecommendations(district.id),
+    getLatestChurnSignal(district.id),
+  ]);
+
   return (
     <div className="p-6 space-y-6">
+      {/* Churn Warning Banner (HIGH risk only) */}
+      {churnSignal && churnSignal.riskLevel === "HIGH" && (
+        <ChurnWarningBanner
+          riskScore={churnSignal.riskScore}
+          riskLevel={churnSignal.riskLevel as "HIGH"}
+          reasons={(churnSignal.reasons as string[]) || []}
+        />
+      )}
+
+      {/* Upsell Banner */}
+      {upsellRecommendations.length > 0 && (
+        <UpsellBanner recommendation={upsellRecommendations[0]} />
+      )}
+
       <DistrictDashboardContent district={district} stats={stats} />
     </div>
   );

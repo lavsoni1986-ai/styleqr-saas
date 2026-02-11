@@ -12,11 +12,6 @@ export async function GET(
     const params = await context.params;
     const { id: orderId } = params;
 
-    // Production-safe: Only log in development
-    if (process.env.NODE_ENV === "development") {
-      console.log("Order fetched:", params.id);
-    }
-
     // Validate order ID
     if (!orderId || typeof orderId !== "string" || orderId.trim().length === 0) {
       return NextResponse.json(

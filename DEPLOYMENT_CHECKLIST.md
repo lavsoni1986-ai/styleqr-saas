@@ -13,7 +13,7 @@ Required:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?connection_limit=20&connect_timeout=10"
-JWT_SECRET="<min 32 chars, use: openssl rand -base64 32>"
+NEXTAUTH_SECRET="<min 32 chars, use: openssl rand -base64 32>"
 ```
 
 Optional:
@@ -27,7 +27,7 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 # CLOUDINARY_API_SECRET=
 ```
 
-- [ ] `JWT_SECRET` must be set; `auth.edge` throws on empty.
+- [ ] `NEXTAUTH_SECRET` must be set for NextAuth session encryption.
 - [ ] `DATABASE_URL` must point to a running PostgreSQL instance.
 
 ---
@@ -59,7 +59,7 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 ## 5. Post-Deploy Checks
 
 - [ ] **Health:** `GET /api/health` → 200.
-- [ ] **Login:** `POST /api/auth/login` with `{ email, password }` → 200, `styleqr-session` cookie, `redirectTo`.
+- [ ] **Login:** Sign in via `/login` (NextAuth credentials) → redirect to dashboard.
 - [ ] **Dashboard:** After login, `/dashboard` loads (or “Restaurant Not Found” if no restaurant yet).
 - [ ] **QR:** `GET /api/qr?token=<valid qrToken>` → 200 with `restaurantId`, `tableId`, etc.
 - [ ] **Menu:** `GET /api/menu?restaurantId=<id>` → 200, array of categories with items.
@@ -79,7 +79,7 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 | Issue | Cause | Fix |
 |-------|--------|-----|
 | `EADDRINUSE :::3000` | Port 3000 in use | `PORT=3001 npm run start` or stop the process on 3000. |
-| `JWT_SECRET is required` | Missing or empty in `.env` | Set `JWT_SECRET` (min 32 chars). |
+| `NEXTAUTH_SECRET is required` | Missing or empty in `.env` | Set `NEXTAUTH_SECRET` (min 32 chars). |
 | `Prisma $connect warmup failed` | DB unreachable or wrong `DATABASE_URL` | Check DB, migrations, and `DATABASE_URL`. |
 | `Restaurant Not Found` on dashboard | User has no restaurant | Create restaurant (signup flow or seed) and link to `ownerId`. |
 | `Order not found` after place order | `POST /api/orders` failed (e.g. 400/404/500) or wrong `orderId` | Check `POST /api/orders` response and logs; ensure token and menu item IDs are valid. |
@@ -105,5 +105,5 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 - **Framework:** Next.js 16.1.1 (App Router, Turbopack in dev).
 - **DB:** PostgreSQL, Prisma 6.x.
-- **Auth:** JWT in `styleqr-session` cookie; `src/proxy.ts` for route protection.
+- **Auth:** NextAuth (JWT session); `src/proxy.ts` for route protection.
 - **UI:** React 19, Tailwind 4, Lucide.

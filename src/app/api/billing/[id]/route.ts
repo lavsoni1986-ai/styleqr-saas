@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { getSession, getUserRestaurant } from "@/lib/auth";
+import { getAuthUser, getUserRestaurant } from "@/lib/auth";
 import { BillStatus } from "@prisma/client";
 import { isTestMode, testMockData, logTestMode } from "@/lib/test-mode";
 import { upsertSettlementForPayments, removePaymentsFromSettlement, type SettlementUpdateClient } from "@/lib/settlement.server";
+import { createRequestLogger } from "@/lib/logger";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/billing/[id]
  * Get bill details
+ * Rate limited: 30 requests per minute per IP.
  */
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.billing);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     const { id } = await context.params;
 
@@ -25,12 +31,12 @@ export async function GET(
       return NextResponse.json({ bill }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -76,7 +82,11 @@ export async function GET(
 
     return NextResponse.json({ bill }, { status: 200 });
   } catch (error) {
-    console.error("Billing GET [id] error:", error);
+    const reqLogger = createRequestLogger({
+      requestId: request.headers.get("x-request-id") ?? undefined,
+      route: "/api/billing/[id]",
+    });
+    reqLogger.error("Billing GET [id] error", {}, error instanceof Error ? error : undefined);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -84,11 +94,15 @@ export async function GET(
 /**
  * PATCH /api/billing/[id]
  * Update bill (close, add items, etc.)
+ * Rate limited: 30 requests per minute per IP.
  */
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.billing);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     const { id } = await context.params;
 
@@ -99,12 +113,12 @@ export async function PATCH(
       return NextResponse.json({ bill }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -291,7 +305,11 @@ export async function PATCH(
 
     return NextResponse.json({ bill: updatedBill }, { status: 200 });
   } catch (error) {
-    console.error("Billing PATCH [id] error:", error);
+    const reqLogger = createRequestLogger({
+      requestId: request.headers.get("x-request-id") ?? undefined,
+      route: "/api/billing/[id]",
+    });
+    reqLogger.error("Billing PATCH [id] error", {}, error instanceof Error ? error : undefined);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -299,11 +317,15 @@ export async function PATCH(
 /**
  * DELETE /api/billing/[id]
  * Delete a bill. Removes from settlement if it has linked payments, then deletes items, payments, and bill.
+ * Rate limited: 30 requests per minute per IP.
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.billing);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
     const { id } = await context.params;
 
@@ -312,12 +334,12 @@ export async function DELETE(
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    const session = await getSession();
-    if (!session) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const restaurant = await getUserRestaurant(session.id);
+    const restaurant = await getUserRestaurant(user.id);
     if (!restaurant) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
@@ -346,7 +368,11 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error("Bill delete failed:", error);
+    const reqLogger = createRequestLogger({
+      requestId: request.headers.get("x-request-id") ?? undefined,
+      route: "/api/billing/[id]",
+    });
+    reqLogger.error("Bill delete failed", {}, error instanceof Error ? error : undefined);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -3,6 +3,25 @@
  * Handles file uploads to Cloudinary using unsigned upload preset
  */
 
+/**
+ * Get a Cloudinary URL with optional size transformation.
+ * Use smaller dimensions to reduce load time and avoid 504 timeouts.
+ * Format: w_WIDTH,h_HEIGHT,c_fill,f_auto,q_auto
+ */
+export function getCloudinaryThumbnail(
+  url: string | null | undefined,
+  opts?: { width?: number; height?: number }
+): string {
+  if (!url || typeof url !== "string" || !url.includes("cloudinary.com")) {
+    return url || "";
+  }
+  const w = opts?.width ?? 400;
+  const h = opts?.height ?? 400;
+  const transform = `w_${w},h_${h},c_fill,f_auto,q_auto`;
+  // Insert transformation after /upload/ and before version or path
+  return url.replace(/\/upload\/(v\d+\/)?/, `/upload/${transform}/$1`);
+}
+
 export const uploadToCloudinary = async (file: File): Promise<string> => {
   // Validate file
   if (!file) {

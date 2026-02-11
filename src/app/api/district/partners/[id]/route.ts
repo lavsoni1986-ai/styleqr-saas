@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma.server";
-import { requireDistrictAdmin, getUserDistrict } from "@/lib/auth";
+import { getUserDistrict } from "@/lib/auth";
+import { requireDistrictAdmin } from "@/lib/require-role";
 
 export const dynamic = "force-dynamic";
 

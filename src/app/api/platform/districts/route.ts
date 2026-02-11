@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
-import { requireSuperAdmin } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
+import { apiGuard } from "@/lib/rbac";
+import { rateLimitOr429, rateLimitConfigs } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
+import { checkDistrictGuard } from "@/lib/beta-metrics";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.platform);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
-    await requireSuperAdmin();
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN"]);
+    if (guardError) return guardError;
 
     const districts = await prisma.district.findMany({
       include: {
@@ -32,15 +41,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ districts, success: true }, { status: 200 });
   } catch (error) {
-    console.error("Platform districts GET error:", error);
-
-    if (error instanceof Error && error.message.includes("Super admin")) {
-      return NextResponse.json(
-        { error: "Super admin access required", success: false },
-        { status: 403 }
-      );
-    }
-
+    logger.error("Platform districts GET error", {}, error instanceof Error ? error : undefined);
     return NextResponse.json(
       { error: "Internal server error", success: false },
       { status: 500 }
@@ -49,8 +50,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimitRes = rateLimitOr429(request, rateLimitConfigs.platform);
+  if (rateLimitRes) return rateLimitRes;
+
   try {
-    await requireSuperAdmin();
+    const user = await getAuthUser();
+    const guardError = apiGuard(user, ["SUPER_ADMIN"]);
+    if (guardError) return guardError;
 
     let body: unknown;
     try {
@@ -143,6 +149,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      const districtCount = await prisma.district.count();
+      checkDistrictGuard(districtCount);
+
       return NextResponse.json(
         {
           message: "District created successfully",
@@ -161,22 +170,7 @@ export async function POST(request: NextRequest) {
       throw prismaError;
     }
   } catch (error) {
-    console.error("Platform districts POST error:", error);
-
-    if (error instanceof Error && error.message.includes("Super admin")) {
-      return NextResponse.json(
-        { error: "Super admin access required", success: false },
-        { status: 403 }
-      );
-    }
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: `Internal server error: ${error.message}`, success: false },
-        { status: 500 }
-      );
-    }
-
+    logger.error("Platform districts POST error", {}, error instanceof Error ? error : undefined);
     return NextResponse.json(
       { error: "Internal server error", success: false },
       { status: 500 }

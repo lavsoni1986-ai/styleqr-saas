@@ -1,10 +1,11 @@
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 import OrdersContent from "@/components/dashboard/OrdersContent";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
 
   if (!restaurant) {

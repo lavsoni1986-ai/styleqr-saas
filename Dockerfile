@@ -43,8 +43,13 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Copy custom server.js wrapper (overrides generated server.js)
 COPY server.js ./server.js
 
+# Copy Prisma schema and migrations for runtime migrate deploy
+COPY prisma ./prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+
 RUN mkdir -p public
 
 EXPOSE 8080
 
-CMD ["node", "server.js"]
+# Run migrations on startup, then start server (migrate deploy is idempotent)
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]

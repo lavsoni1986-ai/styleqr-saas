@@ -1,12 +1,27 @@
-import { requireAuth, getUserRestaurant } from "@/lib/auth";
+import { getUserRestaurant } from "@/lib/auth";
+import { requireAuthUser } from "@/lib/require-role";
 import { prisma } from "@/lib/prisma.server";
 import { UtensilsCrossed, ShoppingCart, QrCode, TrendingUp } from "lucide-react";
+import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
+import { NpsBanner } from "@/components/dashboard/NpsBanner";
 
 export const dynamic = "force-dynamic";
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default async function DashboardPage() {
-  const user = await requireAuth();
+  const user = await requireAuthUser();
   const restaurant = await getUserRestaurant(user.id);
+
+  const userWithNps = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { createdAt: true, npsFeedback: { select: { id: true } } },
+  });
+
+  const showNps =
+    !!userWithNps &&
+    !userWithNps.npsFeedback &&
+    Date.now() - new Date(userWithNps.createdAt).getTime() >= SEVEN_DAYS_MS;
 
   if (!restaurant) {
     return (
@@ -19,14 +34,23 @@ export default async function DashboardPage() {
     );
   }
 
-  // Get stats
-  const [totalOrders, pendingOrders, totalCategories, totalItems, totalTables] = await Promise.all([
-    prisma.order.count({ where: { restaurantId: restaurant.id } }),
-    prisma.order.count({ where: { restaurantId: restaurant.id, status: "PENDING" } }),
-    prisma.category.count({ where: { restaurantId: restaurant.id } }),
-    prisma.menuItem.count({ where: { category: { restaurantId: restaurant.id } } }),
-    prisma.table.count({ where: { restaurantId: restaurant.id } }),
-  ]);
+  // Get stats and onboarding progress
+  const [totalOrders, pendingOrders, totalCategories, totalItems, totalTables, paymentGatewaysCount] =
+    await Promise.all([
+      prisma.order.count({ where: { restaurantId: restaurant.id } }),
+      prisma.order.count({ where: { restaurantId: restaurant.id, status: "PENDING" } }),
+      prisma.category.count({ where: { restaurantId: restaurant.id } }),
+      prisma.menuItem.count({ where: { category: { restaurantId: restaurant.id } } }),
+      prisma.table.count({ where: { restaurantId: restaurant.id } }),
+      prisma.paymentGateway.count({ where: { restaurantId: restaurant.id } }),
+    ]);
+
+  const onboardingProgress = {
+    hasMenu: totalCategories > 0 || totalItems > 0,
+    hasPayments: paymentGatewaysCount > 0,
+    hasQr: totalTables > 0,
+    hasOrder: totalOrders > 0,
+  };
 
   const stats = [
     {
@@ -61,6 +85,10 @@ export default async function DashboardPage() {
         <h1 className="text-2xl md:text-3xl font-bold text-zinc-100 tracking-tight">Dashboard</h1>
         <p className="text-zinc-400 mt-1">Welcome back, {user.name || user.email}</p>
       </div>
+
+      <OnboardingChecklist progress={onboardingProgress} />
+
+      <NpsBanner show={showNps} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         {stats.map((stat, index) => (
