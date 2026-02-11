@@ -61,9 +61,6 @@ CREATE UNIQUE INDEX "District_stripeCustomerId_key" ON "District"("stripeCustome
 CREATE UNIQUE INDEX "District_stripeSubscriptionId_key" ON "District"("stripeSubscriptionId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "District_cfOrderId_key" ON "District"("cfOrderId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "District_verificationToken_key" ON "District"("verificationToken");
 
 -- CreateIndex
