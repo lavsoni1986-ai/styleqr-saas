@@ -51,4 +51,4 @@ RUN mkdir -p public
 EXPOSE 8080
 
 # Run migrations on startup, then start server (migrate deploy is idempotent)
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260211072206_add_context_node_id"]
