@@ -82,23 +82,39 @@ export default function LoginPage() {
             </div>
           )}
 
-          <input
-            type="email"
-            required
-            className="input-dark w-full px-4 py-3"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-1.5 sr-only">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              className="input-dark w-full px-4 py-3"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
 
-          <input
-            type="password"
-            required
-            className="input-dark w-full px-4 py-3"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-zinc-300 mb-1.5 sr-only">
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              className="input-dark w-full px-4 py-3"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
 
           <button
             type="submit"
