@@ -216,11 +216,11 @@ export function RequestAccessModal({ isOpen, onClose }: RequestAccessModalProps)
                     required
                     minLength={2}
                     disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50"
+                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50 text-white placeholder:text-gray-400"
                     style={{
                       backgroundColor: tokens.colors.bg,
                       border: "1px solid #1F2733",
-                      color: tokens.colors.textPrimary,
+                      color: "#ffffff",
                     }}
                     placeholder="Jane Doe"
                   />
@@ -242,11 +242,11 @@ export function RequestAccessModal({ isOpen, onClose }: RequestAccessModalProps)
                     onChange={handleChange}
                     required
                     disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/50 disabled:opacity-50"
+                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/50 disabled:opacity-50 text-white placeholder:text-gray-400"
                     style={{
                       backgroundColor: tokens.colors.bg,
                       border: "1px solid #1F2733",
-                      color: tokens.colors.textPrimary,
+                      color: "#ffffff",
                     }}
                     placeholder="you@example.com"
                   />
@@ -269,11 +269,11 @@ export function RequestAccessModal({ isOpen, onClose }: RequestAccessModalProps)
                     required
                     minLength={2}
                     disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50"
+                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50 text-white placeholder:text-gray-400"
                     style={{
                       backgroundColor: tokens.colors.bg,
                       border: "1px solid #1F2733",
-                      color: tokens.colors.textPrimary,
+                      color: "#ffffff",
                     }}
                     placeholder="Acme Restaurants"
                   />
@@ -296,11 +296,11 @@ export function RequestAccessModal({ isOpen, onClose }: RequestAccessModalProps)
                     required
                     minLength={2}
                     disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50"
+                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50 text-white placeholder:text-gray-400"
                     style={{
                       backgroundColor: tokens.colors.bg,
                       border: "1px solid #1F2733",
-                      color: tokens.colors.textPrimary,
+                      color: "#ffffff",
                     }}
                     placeholder="Mumbai Central"
                   />
@@ -321,11 +321,11 @@ export function RequestAccessModal({ isOpen, onClose }: RequestAccessModalProps)
                     onChange={handleChange}
                     required
                     disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50"
+                    className="w-full px-4 py-3 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 disabled:opacity-50 text-white"
                     style={{
                       backgroundColor: tokens.colors.bg,
                       border: "1px solid #1F2733",
-                      color: tokens.colors.textPrimary,
+                      color: "#ffffff",
                     }}
                   >
                     <option value="">Select scale</option>
