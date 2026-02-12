@@ -8,7 +8,7 @@
     "postinstall": "prisma generate",
     "db:deploy": "node ./node_modules/prisma/build/index.js migrate deploy",
     "db:push": "prisma db push",
-    "start": "node server.js",
+    "start": "node scripts/start-with-repair.js",
     "lint": "eslint .",
     "load:homepage": "k6 run load-tests/homepage.js",
     "load:health": "k6 run load-tests/health.js",

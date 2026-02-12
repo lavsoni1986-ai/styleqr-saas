@@ -54,4 +54,4 @@ RUN mkdir -p public
 EXPOSE 8080
 
 # Run migrations on startup, then start server (migrate deploy is idempotent)
-CMD ["node", "scripts/db-repair.js"]
+CMD ["npm", "start"]
