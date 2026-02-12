@@ -4,6 +4,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🛠️ Starting Database Repair...");
 
+  try {
+    console.log("🔓 Attempting to unlock database...");
+    const { execSync } = require('child_process');
+    // Force rollback the failed migration to unlock the queue
+    execSync('node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260211072206_add_context_node_id', { stdio: 'inherit' });
+    console.log("✅ Database unlocked (marked as rolled back).");
+  } catch (e) {
+    console.log("⚠️ Rollback command warning (ignoring if already resolved):", e.message);
+  }
+
   // List of potential conflicting indexes to drop (Safety check)
   const indexesToDrop = [
     'Reseller_cfVendorId_key',
