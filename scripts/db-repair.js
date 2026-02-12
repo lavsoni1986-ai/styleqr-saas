@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { execSync } = require('child_process');
 const prisma = new PrismaClient();
 
 async function main() {
@@ -6,7 +7,6 @@ async function main() {
 
   try {
     console.log("🔓 Attempting to unlock database...");
-    const { execSync } = require('child_process');
     // Force rollback the failed migration to unlock the queue
     execSync('node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260211072206_add_context_node_id', { stdio: 'inherit' });
     console.log("✅ Database unlocked (marked as rolled back).");
@@ -32,6 +32,9 @@ async function main() {
   }
 
   console.log("✨ Repair finished. Exiting to allow migration to run.");
+
+  console.log("🚀 Starting Server from repair script...");
+  execSync('node node_modules/prisma/build/index.js migrate deploy && node server.js', { stdio: 'inherit' });
 }
 
 main()
