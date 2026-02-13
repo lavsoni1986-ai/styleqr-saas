@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && cross-env SKIP_ENV_VALIDATION=true next build",
+    "build": "prisma generate && cross-env SKIP_ENV_VALIDATION=true next build --webpack",
     "postinstall": "prisma generate",
     "db:deploy": "node ./node_modules/prisma/build/index.js migrate deploy",
     "db:push": "prisma db push",
