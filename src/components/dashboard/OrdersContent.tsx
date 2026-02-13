@@ -430,6 +430,7 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
                 {checkoutOrder.bill.balance.toFixed(2)}
               </p>
               <CashfreeButton
+                key={checkoutOrder.bill.id}
                 billId={checkoutOrder.bill.id}
                 amount={checkoutOrder.bill.balance}
                 orderId={checkoutOrder.orderId}

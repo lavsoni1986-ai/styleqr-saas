@@ -12,33 +12,12 @@ declare global {
         returnUrl?: string;
         backdrop?: boolean;
         components?: Array<"order-details" | "payment-form">;
-        style?: {
-          backgroundColor?: string;
-          color?: string;
-          fontFamily?: string;
-          fontSize?: string;
-          fontWeight?: string;
-          errorColor?: string;
-          theme?: "light" | "dark";
-        };
+        style?: Record<string, string | undefined>;
       }) => void;
     };
   }
 }
 
-interface CashfreeButtonProps {
-  billId: string;
-  amount: number;
-  orderId?: string;
-  returnUrl?: string;
-  onSuccess?: () => void;
-  onError?: (message: string) => void;
-  disabled?: boolean;
-  className?: string;
-  children?: React.ReactNode;
-}
-
-const LAV_DARK_BG = "#0B0F14";
 const isSandbox =
   process.env.NEXT_PUBLIC_CASHFREE_ENV === "TEST" ||
   process.env.NEXT_PUBLIC_CASHFREE_ENV === "sandbox" ||
@@ -47,58 +26,50 @@ const CASHFREE_SDK = isSandbox
   ? "https://sdk.cashfree.com/js/v3/cashfree.sandbox.js"
   : "https://sdk.cashfree.com/js/v3/cashfree.js";
 
-export default function CashfreeButton({
-  billId,
-  amount,
+interface CustomerPayButtonProps {
+  orderId: string;
+  amount: number;
+  onSuccess?: () => void;
+  onError?: (message: string) => void;
+  disabled?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export default function CustomerPayButton({
   orderId,
-  returnUrl,
+  amount,
   onSuccess,
   onError,
   disabled = false,
   className = "",
   children,
-}: CashfreeButtonProps) {
+}: CustomerPayButtonProps) {
   const [loading, setLoading] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
 
-  // Poll for SDK (handles cases where onLoad was missed)
+  // Detect SDK already loaded by order layout (preloads Cashfree)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const check = () => {
-      if (typeof window.Cashfree?.checkout === "function") {
-        setSdkReady(true);
-        return true;
-      }
-      return false;
-    };
-    if (check()) return;
-    const id = setInterval(() => {
-      if (check()) clearInterval(id);
-    }, 1000);
-    return () => clearInterval(id);
+    if (typeof window !== "undefined" && typeof window.Cashfree?.checkout === "function") {
+      setSdkReady(true);
+    }
   }, []);
 
   const handlePay = useCallback(async () => {
-    if (loading || disabled) return;
-
-    if (typeof window.Cashfree?.checkout !== "function") {
-      alert("Payment system still loading, please try again");
-      return;
-    }
+    if (loading || disabled || !sdkReady) return;
 
     setLoading(true);
 
     try {
-      const res = await fetch("/api/payments/create-order", {
+      const res = await fetch(`/api/orders/${orderId}/pay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ billId, amount, orderId: orderId || undefined }),
       });
 
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to create payment order");
+        throw new Error(data?.error || "Failed to create payment");
       }
 
       const { payment_session_id } = data;
@@ -108,18 +79,21 @@ export default function CashfreeButton({
       }
 
       if (typeof window.Cashfree?.checkout !== "function") {
-        alert("Payment system still loading, please try again");
-        setLoading(false);
-        return;
+        throw new Error("Payment SDK not loaded");
       }
+
+      const returnUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/order/${orderId}?payment=success`
+          : undefined;
 
       window.Cashfree.checkout({
         paymentSessionId: payment_session_id,
-        returnUrl: returnUrl || window.location.origin + "/dashboard/payments",
+        returnUrl,
         backdrop: true,
         components: ["order-details", "payment-form"],
         style: {
-          backgroundColor: LAV_DARK_BG,
+          backgroundColor: "#0a0a0a",
           color: "#ffffff",
           theme: "dark",
           fontFamily: "inherit",
@@ -136,7 +110,7 @@ export default function CashfreeButton({
     } finally {
       setLoading(false);
     }
-  }, [billId, amount, orderId, returnUrl, loading, disabled, onSuccess, onError]);
+  }, [orderId, amount, loading, disabled, sdkReady, onSuccess, onError]);
 
   return (
     <>
@@ -148,10 +122,10 @@ export default function CashfreeButton({
       <button
         type="button"
         onClick={handlePay}
-        disabled={loading || disabled || amount <= 0}
+        disabled={loading || disabled || !sdkReady || amount <= 0}
         className={
           className ||
-          "w-full py-4 bg-amber-500 text-zinc-950 font-bold text-lg rounded-xl hover:bg-amber-400 active:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors touch-manipulation shadow-lg shadow-amber-900/20"
+          "w-full py-4 bg-amber-500 text-zinc-950 font-bold text-lg rounded-xl hover:bg-amber-400 active:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors touch-manipulation shadow-lg"
         }
       >
         {loading ? (
@@ -159,11 +133,16 @@ export default function CashfreeButton({
             <Loader2 className="h-5 w-5 animate-spin" />
             Opening checkout...
           </>
+        ) : !sdkReady ? (
+          <>
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading payment...
+          </>
         ) : (
           children || (
             <>
               <CreditCard className="h-5 w-5" />
-              Pay ₹{amount.toFixed(2)} with Card / UPI
+              Pay ₹{amount.toFixed(2)} Now
             </>
           )
         )}

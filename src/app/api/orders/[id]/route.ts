@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma.server";
+import { BillStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,20 @@ export async function GET(
       );
     }
 
+    // When SERVED, fetch the OPEN bill for this table (for customer Pay Now)
+    let bill: { id: string; billNumber: string; balance: number } | null = null;
+    if (order.status === "SERVED" && order.tableId) {
+      const openBill = await prisma.bill.findFirst({
+        where: {
+          restaurantId: order.restaurantId,
+          tableId: order.tableId,
+          status: BillStatus.OPEN,
+        },
+        select: { id: true, billNumber: true, balance: true },
+      });
+      if (openBill) bill = openBill;
+    }
+
     // Return public order data
     return NextResponse.json(
       {
@@ -88,6 +103,7 @@ export async function GET(
           quantity: item.quantity,
           price: item.price,
         })),
+        bill,
       },
       { status: 200 }
     );

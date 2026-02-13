@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { getCloudinaryThumbnail } from "@/lib/cloudinary";
 import {
@@ -11,8 +11,11 @@ import {
   Loader2,
   UtensilsCrossed,
   AlertCircle,
+  CreditCard,
+  RefreshCcw,
 } from "lucide-react";
 import { OrderStatus } from "@prisma/client";
+import CustomerPayButton from "@/components/order/CustomerPayButton";
 
 type OrderItem = {
   id: string;
@@ -42,20 +45,27 @@ type OrderData = {
     name: string | null;
   } | null;
   items: OrderItem[];
+  bill?: { id: string; billNumber: string; balance: number } | null;
 };
 
 export default function OrderTrackingClient({ orderId }: { orderId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [payError, setPayError] = useState<string | null>(null);
+  const servedFetchDone = useRef(false);
+
+  const paymentSuccess = searchParams.get("payment") === "success";
 
   const fetchOrder = useCallback(async () => {
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
         method: "GET",
         headers: { Accept: "application/json" },
+        cache: "no-store",
       });
 
       if (!response.ok) {
@@ -71,6 +81,20 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
       const data = (await response.json()) as OrderData;
       setOrder(data);
       setError(null);
+
+      // Debug: log bill data when order is ready to pay
+      if (data.status === "SERVED" || data.status === "READY_TO_SERVE") {
+        console.log("Mobile Bill Data:", data.bill ?? null);
+      }
+
+      // Force one extra fetch when first reaching SERVED to get latest bill
+      if (
+        (data.status === "SERVED" || data.status === "READY_TO_SERVE") &&
+        !servedFetchDone.current
+      ) {
+        servedFetchDone.current = true;
+        setTimeout(() => fetchOrder(), 500);
+      }
 
       // Calculate time elapsed
       const createdAt = new Date(data.createdAt).getTime();
@@ -89,16 +113,26 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
     fetchOrder();
   }, [fetchOrder]);
 
-  // Auto-refresh every 5 seconds (disable when SERVED)
+  // Auto-refresh: 3s when PREPARING (waiting for SERVED), 5s when SERVED/READY_TO_SERVE (waiting for PAID)
   useEffect(() => {
-    if (loading || error || order?.status === "SERVED") return;
+    if (loading || error || order?.status === "PAID") return;
 
+    const waitingForServed = order?.status === "PREPARING";
+    const waitingForPaid = order?.status === "SERVED" || order?.status === "READY_TO_SERVE";
+    const ms = waitingForServed || waitingForPaid ? 3000 : 5000;
     const interval = setInterval(() => {
       fetchOrder();
-    }, 5000);
+    }, ms);
 
     return () => clearInterval(interval);
   }, [loading, error, order?.status, fetchOrder]);
+
+  // Refetch when returning from payment (payment=success in URL)
+  useEffect(() => {
+    if (paymentSuccess && order) {
+      fetchOrder();
+    }
+  }, [paymentSuccess, order, fetchOrder]);
 
   // Update time elapsed every second
   useEffect(() => {
@@ -148,7 +182,14 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
           label: "Ready",
           color: "bg-emerald-500/20 text-emerald-300 border-emerald-400/40",
           icon: CheckCircle,
-          message: "Your order is ready! Enjoy your meal 🎉",
+          message: "Your order is ready! Pay below to complete.",
+        };
+      case "PAID":
+        return {
+          label: "Paid",
+          color: "bg-violet-500/20 text-violet-300 border-violet-400/40",
+          icon: CreditCard,
+          message: "Payment successful! Thank you for dining with us.",
         };
       case "CANCELLED":
         return {
@@ -205,7 +246,8 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
   const statusConfig = getStatusConfig(order.status);
   const StatusIcon = statusConfig.icon;
   const isPreparing = order.status === "PREPARING";
-  const isServed = order.status === "SERVED";
+  const isReadyToPay = order.status === "SERVED" || order.status === "READY_TO_SERVE";
+  const isPaid = order.status === "PAID";
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-28">
@@ -214,6 +256,7 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
           <button
             onClick={() => router.back()}
             className="p-2 -ml-2 hover:bg-white/10 rounded-xl transition-colors touch-manipulation"
+            aria-label="Go back"
           >
             <svg className="h-6 w-6 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -223,6 +266,13 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
             <h1 className="text-lg font-bold text-zinc-100 truncate">Order Tracking</h1>
             <p className="text-xs text-zinc-500 truncate">{order.restaurant.name}</p>
           </div>
+          <button
+            onClick={() => fetchOrder()}
+            className="p-2 hover:bg-white/10 rounded-xl transition-colors touch-manipulation"
+            aria-label="Refresh order status"
+          >
+            <RefreshCcw className="h-5 w-5 text-zinc-400" />
+          </button>
         </div>
       </div>
 
@@ -231,13 +281,15 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
           <div className="flex flex-col items-center text-center space-y-4">
             <div
               className={`p-5 rounded-full ${
-                isPreparing ? "bg-orange-500/20 border-2 border-orange-400/40" : isServed ? "bg-emerald-500/20 border-2 border-emerald-400/40" : "bg-white/10 border-2 border-white/10"
+                isPreparing ? "bg-orange-500/20 border-2 border-orange-400/40" : isReadyToPay ? "bg-emerald-500/20 border-2 border-emerald-400/40" : isPaid ? "bg-violet-500/20 border-2 border-violet-400/40" : "bg-white/10 border-2 border-white/10"
               }`}
             >
               {isPreparing ? (
                 <ChefHat className="h-8 w-8 text-orange-400 animate-pulse" />
-              ) : isServed ? (
+              ) : isReadyToPay ? (
                 <CheckCircle className="h-8 w-8 text-emerald-400" />
+              ) : isPaid ? (
+                <CreditCard className="h-8 w-8 text-violet-400" />
               ) : (
                 <StatusIcon className="h-8 w-8 text-zinc-400" />
               )}
@@ -334,8 +386,9 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
               { status: "ACCEPTED", label: "Order Accepted" },
               { status: "PREPARING", label: "Preparing Food" },
               { status: "SERVED", label: "Ready to Serve" },
+              { status: "PAID", label: "Payment Complete" },
             ].map((step, index) => {
-              const statusOrder = ["PENDING", "ACCEPTED", "PREPARING", "SERVED"];
+              const statusOrder = ["PENDING", "ACCEPTED", "PREPARING", "SERVED", "PAID"];
               const currentIndex = statusOrder.indexOf(order.status);
               const stepIndex = statusOrder.indexOf(step.status);
               const isCompleted = stepIndex <= currentIndex;
@@ -351,13 +404,13 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
                     >
                       {isCompleted && <CheckCircle className="h-5 w-5 text-white" />}
                     </div>
-                    {index < 3 && <div className={`w-0.5 h-12 ${isCompleted ? "bg-emerald-500" : "bg-white/10"}`} />}
+                    {index < 4 && <div className={`w-0.5 h-12 ${isCompleted ? "bg-emerald-500" : "bg-white/10"}`} />}
                   </div>
                   <div className="flex-1 pt-1">
                     <p className={`font-semibold ${isCompleted ? "text-zinc-100" : "text-zinc-500"}`}>{step.label}</p>
                     {isCurrent && (
                       <p className="text-xs text-zinc-500 mt-1">
-                        {isPreparing ? "Cooking in progress..." : isServed ? "Ready for you!" : "In progress"}
+                        {isPreparing ? "Cooking in progress..." : isReadyToPay ? "Tap Pay Now below" : isPaid ? "Thank you!" : "In progress"}
                       </p>
                     )}
                   </div>
@@ -368,7 +421,7 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
         </div>
       </div>
 
-      {!isServed && (
+      {!isReadyToPay && !isPaid && (
         <div className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 py-4 px-6 z-20 safe-area-inset-bottom">
           <div className="max-w-md mx-auto flex items-center justify-center gap-3">
             {isPreparing ? (
@@ -386,11 +439,32 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
         </div>
       )}
 
-      {isServed && (
-        <div className="fixed bottom-0 left-0 right-0 bg-emerald-500/20 backdrop-blur-xl border-t border-emerald-400/30 py-4 px-6 z-20 safe-area-inset-bottom">
-          <div className="max-w-md mx-auto flex items-center justify-center gap-3">
-            <CheckCircle className="h-5 w-5 text-emerald-400" />
+      {isReadyToPay && (
+        <div className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 py-4 px-6 z-20 safe-area-inset-bottom">
+          <div className="max-w-md mx-auto space-y-3">
             <p className="font-semibold text-zinc-100 text-center">{statusConfig.message}</p>
+            {payError && (
+              <p className="text-sm text-red-400 text-center">{payError}</p>
+            )}
+            <CustomerPayButton
+              orderId={orderId}
+              amount={order.bill?.balance ?? order.total}
+              onSuccess={() => setPayError(null)}
+              onError={(msg) => setPayError(msg)}
+              className="w-full py-4 bg-amber-500 text-zinc-950 font-bold text-lg rounded-xl hover:bg-amber-400 active:bg-amber-300 flex items-center justify-center gap-2"
+            >
+              Pay ₹{(order.bill?.balance ?? order.total).toFixed(2)} Now
+            </CustomerPayButton>
+          </div>
+        </div>
+      )}
+
+      {isPaid && (
+        <div className="fixed bottom-0 left-0 right-0 bg-violet-500/20 backdrop-blur-xl border-t border-violet-400/30 py-6 px-6 z-20 safe-area-inset-bottom">
+          <div className="max-w-md mx-auto flex flex-col items-center justify-center gap-2">
+            <CreditCard className="h-8 w-8 text-violet-400" />
+            <p className="font-bold text-zinc-100 text-center text-lg">Payment Successful</p>
+            <p className="text-sm text-zinc-400 text-center">Thank you for dining with us!</p>
           </div>
         </div>
       )}
