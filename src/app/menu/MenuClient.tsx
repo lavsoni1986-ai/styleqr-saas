@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { AlertCircle, Loader2, UtensilsCrossed, CheckCircle, WifiOff } from "lucide-react";
+import { AlertCircle, Loader2, UtensilsCrossed, CheckCircle, WifiOff, MapPin } from "lucide-react";
 import { MobileMenuCard, type MobileMenuItem } from "@/components/menu/MobileMenuCard";
 import { MobileCartBar } from "@/components/menu/MobileCartBar";
 import { CartDrawer, type CartItem } from "@/components/menu/CartDrawer";
@@ -10,6 +10,7 @@ import { CategoryTabs } from "@/components/menu/CategoryTabs";
 import { offlineQueue } from "@/lib/offline/queue.engine";
 import { networkMonitor } from "@/lib/offline/network.monitor";
 import { logOrder, logError } from "@/lib/observability/logger";
+import { setActiveOrder, getActiveOrder } from "@/lib/active-order-storage";
 
 type QrResponse = {
   tableId: string;
@@ -44,8 +45,25 @@ export default function MenuClient() {
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>("");
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Check for active order in localStorage (same restaurant)
+  useEffect(() => {
+    if (!restaurantId) return;
+    const sync = () => {
+      const stored = getActiveOrder();
+      if (stored && stored.restaurantId === restaurantId) {
+        setActiveOrderId(stored.orderId);
+      } else {
+        setActiveOrderId(null);
+      }
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, [restaurantId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -239,6 +257,7 @@ export default function MenuClient() {
           // Success - order placed
           const newOrderId = (json as any).orderId;
           logOrder("Order placed successfully", { orderId: newOrderId, token, itemCount: cartCount });
+          setActiveOrder(newOrderId, restaurantId);
           setCart({});
           router.push(`/order/${newOrderId}`);
           setPlacingOrder(false);
@@ -425,6 +444,26 @@ export default function MenuClient() {
           ))
         )}
       </div>
+
+      {/* Track Active Order - floating button when user has an order in progress */}
+      {activeOrderId && (
+        <div
+          className={`fixed left-0 right-0 z-40 px-4 safe-area-inset-bottom ${
+            cartCount > 0 ? "bottom-40" : "bottom-8"
+          }`}
+        >
+          <div className="max-w-md mx-auto">
+            <button
+              type="button"
+              onClick={() => router.push(`/order/${activeOrderId}`)}
+              className="w-full py-3 px-4 bg-emerald-500/90 hover:bg-emerald-500 text-zinc-950 font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg border border-emerald-400/50 touch-manipulation"
+            >
+              <MapPin className="h-5 w-5" />
+              Track Active Order
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Cart Bar */}
       <MobileCartBar

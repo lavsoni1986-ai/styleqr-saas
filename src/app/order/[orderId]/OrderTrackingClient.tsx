@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { OrderStatus } from "@prisma/client";
 import CustomerPayButton from "@/components/order/CustomerPayButton";
+import { setActiveOrder, clearActiveOrder } from "@/lib/active-order-storage";
 
 type OrderItem = {
   id: string;
@@ -71,6 +72,7 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
       if (!response.ok) {
         if (response.status === 404) {
           setError("Order not found");
+          clearActiveOrder(); // Stale/invalid order - allow fresh start
         } else {
           setError("Failed to load order");
         }
@@ -81,6 +83,13 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
       const data = (await response.json()) as OrderData;
       setOrder(data);
       setError(null);
+
+      // Persist orderId for recovery when navigating away
+      if (data.status === "PAID") {
+        clearActiveOrder();
+      } else {
+        setActiveOrder(data.id, data.restaurant.id);
+      }
 
       // Debug: log bill data when order is ready to pay
       if (data.status === "SERVED" || data.status === "READY_TO_SERVE") {
