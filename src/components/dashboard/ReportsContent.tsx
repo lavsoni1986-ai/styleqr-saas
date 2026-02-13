@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BarChart3, Download, Calendar, Loader2, TrendingUp, DollarSign } from "lucide-react";
+import { BarChart3, Download, Calendar, Loader2, TrendingUp, DollarSign, Sparkles, MessageSquare } from "lucide-react";
 
 interface ReportsContentProps {
   restaurantId: string;
@@ -28,27 +28,45 @@ interface DailySalesReport {
   };
 }
 
+interface DailyReport {
+  id: string;
+  reportDate: string;
+  totalRevenue: number;
+  smartInsight: string | null;
+  formattedMessage: string | null;
+}
+
 export default function ReportsContent({ restaurantId, restaurantName }: ReportsContentProps) {
   const [report, setReport] = useState<DailySalesReport | null>(null);
+  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports/daily-sales?date=${selectedDate}`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError((data as any)?.error || "Failed to load report");
+      const [salesRes, dailyRes] = await Promise.all([
+        fetch(`/api/reports/daily-sales?date=${selectedDate}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        }),
+        fetch(`/api/admin/reports/daily-report?date=${selectedDate}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        }),
+      ]);
+      const salesData = await salesRes.json().catch(() => null);
+      const dailyData = await dailyRes.json().catch(() => null);
+      if (!salesRes.ok) {
+        setError((salesData as any)?.error || "Failed to load report");
         setReport(null);
         return;
       }
-      setReport(data);
+      setReport(salesData);
+      setDailyReport(dailyData && dailyData.id ? dailyData : null);
     } catch (err) {
       setError("Failed to connect to the server");
     } finally {
@@ -59,6 +77,34 @@ export default function ReportsContent({ restaurantId, restaurantName }: Reports
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
+
+  const generateDailySummary = useCallback(async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/reports/daily-summary?date=${selectedDate}&generate=true`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError((data as any)?.error || "Failed to generate report");
+        return;
+      }
+      setDailyReport({
+        id: "generated",
+        reportDate: selectedDate,
+        totalRevenue: data.totalRevenue ?? 0,
+        smartInsight: data.smartInsight ?? null,
+        formattedMessage: data.formattedMessage ?? null,
+      });
+      fetchReport();
+    } catch (err) {
+      setError("Failed to generate report");
+    } finally {
+      setGenerating(false);
+    }
+  }, [selectedDate, fetchReport]);
 
   const exportCSV = () => {
     if (!report) return;
@@ -106,13 +152,26 @@ export default function ReportsContent({ restaurantId, restaurantName }: Reports
           <h1 className="text-2xl md:text-3xl font-bold text-zinc-100 tracking-tight">Reports</h1>
           <p className="text-zinc-400 mt-1">Sales and analytics</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50"
+            aria-label="Select report date"
           />
+          <button
+            onClick={generateDailySummary}
+            disabled={generating}
+            className="btn-primary-admin px-4 py-2 flex items-center gap-2 disabled:opacity-50"
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {generating ? "Generating..." : "Generate Daily Report"}
+          </button>
           {report && (
             <button
               onClick={exportCSV}
@@ -128,6 +187,25 @@ export default function ReportsContent({ restaurantId, restaurantName }: Reports
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-400/30 rounded-xl text-red-300 text-sm">
           {error}
+        </div>
+      )}
+
+      {/* Daily Report / WhatsApp Mockup - Smart Insight */}
+      {dailyReport && (dailyReport.smartInsight || dailyReport.formattedMessage) && (
+        <div className="mb-6 card-glass p-6 border border-amber-500/20">
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare className="h-5 w-5 text-amber-400" />
+            <h2 className="text-lg font-bold text-zinc-100">Daily Report (WhatsApp Mockup)</h2>
+          </div>
+          <pre className="whitespace-pre-wrap text-sm text-zinc-300 font-mono bg-white/5 rounded-xl p-4 border border-white/10 overflow-x-auto">
+            {dailyReport.formattedMessage ?? dailyReport.smartInsight}
+          </pre>
+          {dailyReport.smartInsight && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-xs text-zinc-500 mb-1">💡 Smart Insight</p>
+              <p className="text-sm text-amber-200/90">{dailyReport.smartInsight}</p>
+            </div>
+          )}
         </div>
       )}
 

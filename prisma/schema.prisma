@@ -186,12 +186,31 @@ model Restaurant {
   shifts          Shift[]
   subscription    Subscription?    @relation("RestaurantSubscription")
   tables          Table[]
+  dailyReports    DailyReport[]
 
   @@index([ownerId])
   @@index([whiteLabelId])
   @@index([partnerId])
   @@index([districtId])
   @@index([subscriptionId])
+}
+
+model DailyReport {
+  id            String   @id @default(uuid())
+  restaurantId  String
+  reportDate    DateTime @db.Date
+  totalRevenue  Float    @default(0)
+  paymentByMethod Json    // { UPI: number, CASH: number, ... }
+  topItems      Json     // [{ name, quantity }]
+  smartInsight  String?  // 3-line AI-generated insight
+  formattedMessage String? // Full message (for WhatsApp mockup)
+  createdAt     DateTime @default(now())
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, reportDate])
+  @@index([restaurantId])
+  @@index([reportDate])
 }
 
 model Category {
