@@ -67,6 +67,7 @@ export default function CashfreeButton({
     const check = () => {
       if (typeof window.Cashfree?.checkout === "function") {
         setSdkReady(true);
+        console.log("[CashfreeButton] SDK detected, sdkReady=true");
         return true;
       }
       return false;
@@ -81,8 +82,8 @@ export default function CashfreeButton({
   const handlePay = useCallback(async () => {
     if (loading || disabled) return;
 
-    if (typeof window.Cashfree?.checkout !== "function") {
-      alert("Payment system still loading, please try again");
+    if (!window.Cashfree) {
+      alert("Payment SDK is taking longer than usual. Please wait 3 seconds and try again.");
       return;
     }
 
@@ -107,8 +108,8 @@ export default function CashfreeButton({
         throw new Error("Invalid response from server");
       }
 
-      if (typeof window.Cashfree?.checkout !== "function") {
-        alert("Payment system still loading, please try again");
+      if (!window.Cashfree || typeof window.Cashfree.checkout !== "function") {
+        alert("Payment SDK is taking longer than usual. Please wait 3 seconds and try again.");
         setLoading(false);
         return;
       }
@@ -143,7 +144,11 @@ export default function CashfreeButton({
       <Script
         src={CASHFREE_SDK}
         strategy="afterInteractive"
-        onLoad={() => setSdkReady(true)}
+        onLoad={() => {
+          setSdkReady(true);
+          console.log("[CashfreeButton] Script onLoad, sdkReady=true");
+        }}
+        onReady={() => setSdkReady(true)}
       />
       <button
         type="button"

@@ -48,15 +48,31 @@ export default function CustomerPayButton({
   const [loading, setLoading] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
 
-  // Detect SDK already loaded by order layout (preloads Cashfree)
+  // Poll for SDK (handles cases where onLoad was missed on mobile)
   useEffect(() => {
-    if (typeof window !== "undefined" && typeof window.Cashfree?.checkout === "function") {
-      setSdkReady(true);
-    }
+    if (typeof window === "undefined") return;
+    const check = () => {
+      if (typeof window.Cashfree?.checkout === "function") {
+        setSdkReady(true);
+        console.log("[CustomerPayButton] SDK detected, sdkReady=true");
+        return true;
+      }
+      return false;
+    };
+    if (check()) return;
+    const id = setInterval(() => {
+      if (check()) clearInterval(id);
+    }, 500);
+    return () => clearInterval(id);
   }, []);
 
   const handlePay = useCallback(async () => {
-    if (loading || disabled || !sdkReady) return;
+    if (loading || disabled) return;
+
+    if (!window.Cashfree) {
+      alert("Payment SDK is taking longer than usual. Please wait 3 seconds and try again.");
+      return;
+    }
 
     setLoading(true);
 
@@ -78,8 +94,10 @@ export default function CustomerPayButton({
         throw new Error("Invalid response from server");
       }
 
-      if (typeof window.Cashfree?.checkout !== "function") {
-        throw new Error("Payment SDK not loaded");
+      if (!window.Cashfree || typeof window.Cashfree.checkout !== "function") {
+        alert("Payment SDK is taking longer than usual. Please wait 3 seconds and try again.");
+        setLoading(false);
+        return;
       }
 
       const returnUrl =
@@ -110,19 +128,23 @@ export default function CustomerPayButton({
     } finally {
       setLoading(false);
     }
-  }, [orderId, amount, loading, disabled, sdkReady, onSuccess, onError]);
+  }, [orderId, amount, loading, disabled, onSuccess, onError]);
 
   return (
     <>
       <Script
         src={CASHFREE_SDK}
         strategy="afterInteractive"
-        onLoad={() => setSdkReady(true)}
+        onLoad={() => {
+          setSdkReady(true);
+          console.log("[CustomerPayButton] Script onLoad, sdkReady=true");
+        }}
+        onReady={() => setSdkReady(true)}
       />
       <button
         type="button"
         onClick={handlePay}
-        disabled={loading || disabled || !sdkReady || amount <= 0}
+        disabled={loading || disabled || amount <= 0}
         className={
           className ||
           "w-full py-4 bg-amber-500 text-zinc-950 font-bold text-lg rounded-xl hover:bg-amber-400 active:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors touch-manipulation shadow-lg"
@@ -132,11 +154,6 @@ export default function CustomerPayButton({
           <>
             <Loader2 className="h-5 w-5 animate-spin" />
             Opening checkout...
-          </>
-        ) : !sdkReady ? (
-          <>
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Loading payment...
           </>
         ) : (
           children || (
