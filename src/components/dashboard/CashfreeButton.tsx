@@ -74,7 +74,7 @@ export default function CashfreeButton({
     if (check()) return;
     const id = setInterval(() => {
       if (check()) clearInterval(id);
-    }, 1000);
+    }, 500);
     return () => clearInterval(id);
   }, []);
 

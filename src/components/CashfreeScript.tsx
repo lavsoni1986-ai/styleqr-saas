@@ -15,5 +15,5 @@ const CASHFREE_SDK = isSandbox
  * Use in layouts where payment is needed (dashboard, order tracking).
  */
 export function CashfreeScript() {
-  return <Script src={CASHFREE_SDK} strategy="afterInteractive" />;
+  return <Script src={CASHFREE_SDK} strategy="beforeInteractive" />;
 }
