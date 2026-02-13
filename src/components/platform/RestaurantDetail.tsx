@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Building2,
   MapPin,
   UtensilsCrossed,
   LayoutGrid,
+  Loader2,
 } from "lucide-react";
 
 interface Restaurant {
@@ -45,7 +48,46 @@ interface RestaurantDetailProps {
   restaurant: Restaurant;
 }
 
+const STATUS_OPTIONS = [
+  { value: "TRIAL", label: "Pending" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "SUSPENDED", label: "Suspended" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "EXPIRED", label: "Expired" },
+] as const;
+
 export default function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
+  const router = useRouter();
+  const [status, setStatus] = useState(
+    restaurant.subscription?.status || "TRIAL"
+  );
+  const [updating, setUpdating] = useState(false);
+
+  const handleStatusChange = async (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const newStatus = e.target.value as (typeof STATUS_OPTIONS)[number]["value"];
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/platform/restaurants/${restaurant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscriptionStatus: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update status");
+      }
+      setStatus(newStatus);
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -94,17 +136,33 @@ export default function RestaurantDetail({ restaurant }: RestaurantDetailProps) 
                 })}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Subscription</span>
-              <span
-                className={
-                  restaurant.subscription?.status === "ACTIVE"
-                    ? "text-emerald-400"
-                    : "text-amber-400"
-                }
-              >
-                {restaurant.subscription?.status || "—"}
-              </span>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-zinc-400">Status</span>
+              <div className="flex items-center gap-2">
+                {updating && (
+                  <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                )}
+                <select
+                  value={status}
+                  onChange={handleStatusChange}
+                  disabled={updating}
+                  aria-label="Restaurant subscription status"
+                  title="Change restaurant status"
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/50 disabled:opacity-50 ${
+                    status === "ACTIVE"
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                      : status === "SUSPENDED"
+                        ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                        : "border-zinc-600 bg-zinc-800/50 text-zinc-300"
+                  }`}
+                >
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>

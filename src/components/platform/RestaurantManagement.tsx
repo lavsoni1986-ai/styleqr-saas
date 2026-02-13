@@ -149,8 +149,10 @@ export default function RestaurantManagement({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2.5 py-1 rounded-md text-xs font-medium ${
+                      <Link
+                        href={`/platform/restaurants/${r.id}`}
+                        title="Click to change status"
+                        className={`inline-flex px-2.5 py-1 rounded-md text-xs font-medium transition-colors hover:opacity-80 ${
                           r.subscription?.status === "ACTIVE"
                             ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                             : r.district?.isActive === false
@@ -163,7 +165,7 @@ export default function RestaurantManagement({
                           : r.district?.isActive === false
                             ? "Inactive"
                             : "Pending"}
-                      </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
