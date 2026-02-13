@@ -127,8 +127,8 @@ const nextConfig: NextConfig = {
 
   // Experimental features
   experimental: {
-    // Optimize CSS
-    optimizeCss: true,
+    // optimizeCss disabled: lightningcss linux-musl binary fails on Railway (SIGSEGV)
+    // optimizeCss: true,
   },
 
   // Turbopack configuration (Next.js 16 default)
