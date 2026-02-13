@@ -34,7 +34,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { billId, amount: amountInput } = body as { billId?: string; amount?: number };
+    const { billId, amount: amountInput, orderId: orderIdTag } = body as {
+      billId?: string;
+      amount?: number;
+      orderId?: string;
+    };
     if (!billId || typeof billId !== "string") {
       return NextResponse.json({ error: "billId is required" }, { status: 400 });
     }
@@ -105,6 +109,7 @@ export async function POST(request: NextRequest) {
       order_tags: {
         billId: bill.id,
         restaurantId: restaurant.id,
+        ...(orderIdTag && typeof orderIdTag === "string" ? { orderId: orderIdTag } : {}),
       },
     };
 

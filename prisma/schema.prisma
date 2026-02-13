@@ -613,6 +613,7 @@ enum OrderStatus {
   ACCEPTED
   PREPARING
   SERVED
+  PAID
   CANCELLED
 }
 

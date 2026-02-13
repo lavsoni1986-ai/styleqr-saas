@@ -55,7 +55,7 @@ export async function PATCH(
 
     const { status } = (body ?? {}) as { status?: unknown };
 
-    if (typeof status !== "string" || !["PENDING", "ACCEPTED", "PREPARING", "SERVED", "CANCELLED"].includes(status)) {
+    if (typeof status !== "string" || !["PENDING", "ACCEPTED", "PREPARING", "SERVED", "PAID", "CANCELLED"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
@@ -220,10 +220,10 @@ export async function DELETE(
     // Tenant isolation: Verify RESTAURANT_ADMIN/RESTAURANT_OWNER can only access their restaurant's orders
     verifyRestaurantAccess(userForScope, order.restaurantId);
 
-    // Only allow deletion of SERVED orders
-    if (order.status !== OrderStatus.SERVED) {
+    // Only allow deletion of SERVED or PAID orders
+    if (order.status !== OrderStatus.SERVED && order.status !== OrderStatus.PAID) {
       return NextResponse.json(
-        { error: "Only SERVED orders can be deleted" },
+        { error: "Only SERVED or PAID orders can be deleted" },
         { status: 400 }
       );
     }

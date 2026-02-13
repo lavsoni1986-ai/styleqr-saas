@@ -86,7 +86,7 @@ export async function PATCH(
       );
     }
 
-    const validStatuses = ["PENDING", "ACCEPTED", "PREPARING", "SERVED", "CANCELLED"];
+    const validStatuses = ["PENDING", "ACCEPTED", "PREPARING", "SERVED", "PAID", "CANCELLED"];
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`, success: false },
@@ -116,7 +116,8 @@ export async function PATCH(
       PENDING: ["ACCEPTED", "CANCELLED"],
       ACCEPTED: ["PREPARING", "CANCELLED"],
       PREPARING: ["SERVED", "CANCELLED"],
-      SERVED: [], // Terminal state
+      SERVED: [], // Terminal state (PAID set by payment webhook)
+      PAID: [], // Terminal state
       CANCELLED: [], // Terminal state
     };
 

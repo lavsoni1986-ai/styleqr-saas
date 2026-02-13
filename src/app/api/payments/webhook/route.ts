@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
 
   const billId = order.order_tags?.billId;
   const orderId = order.order_id;
+  const linkedOrderId = order.order_tags?.orderId as string | undefined;
 
   if (!billId || !orderId) {
     return NextResponse.json({ error: "Missing billId or order_id" }, { status: 400 });
@@ -133,6 +134,14 @@ export async function POST(request: NextRequest) {
         closedAt: newBalance <= 0 ? new Date() : null,
       },
     });
+
+    // When bill is fully paid and orderId was linked, mark order as PAID
+    if (newBalance <= 0 && linkedOrderId) {
+      await prisma.order.updateMany({
+        where: { id: linkedOrderId, status: "SERVED" },
+        data: { status: "PAID" },
+      });
+    }
 
     return NextResponse.json({ received: true });
   } catch (error) {

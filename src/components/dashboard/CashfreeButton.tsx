@@ -29,6 +29,8 @@ declare global {
 interface CashfreeButtonProps {
   billId: string;
   amount: number;
+  orderId?: string;
+  returnUrl?: string;
   onSuccess?: () => void;
   onError?: (message: string) => void;
   disabled?: boolean;
@@ -48,6 +50,8 @@ const CASHFREE_SDK = isSandbox
 export default function CashfreeButton({
   billId,
   amount,
+  orderId,
+  returnUrl,
   onSuccess,
   onError,
   disabled = false,
@@ -66,7 +70,7 @@ export default function CashfreeButton({
       const res = await fetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ billId, amount }),
+        body: JSON.stringify({ billId, amount, orderId: orderId || undefined }),
       });
 
       const data = await res.json().catch(() => null);
@@ -87,7 +91,7 @@ export default function CashfreeButton({
 
       window.Cashfree.checkout({
         paymentSessionId: payment_session_id,
-        returnUrl: window.location.origin + "/dashboard/payments",
+        returnUrl: returnUrl || window.location.origin + "/dashboard/payments",
         backdrop: true,
         components: ["order-details", "payment-form"],
         style: {
@@ -108,7 +112,7 @@ export default function CashfreeButton({
     } finally {
       setLoading(false);
     }
-  }, [billId, amount, loading, disabled, sdkReady, onSuccess, onError]);
+  }, [billId, amount, orderId, loading, disabled, sdkReady, onSuccess, onError]);
 
   return (
     <>

@@ -1,7 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ClipboardList, Clock, CheckCircle, XCircle, Loader2, RefreshCcw, Trash2, Ban } from "lucide-react";
+import {
+  ClipboardList,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  RefreshCcw,
+  Trash2,
+  Ban,
+  CreditCard,
+  X,
+} from "lucide-react";
+import CashfreeButton from "./CashfreeButton";
 
 interface OrdersContentProps {
   restaurantId: string;
@@ -30,6 +42,10 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<Set<string>>(new Set());
+  const [checkoutOrder, setCheckoutOrder] = useState<{
+    orderId: string;
+    bill: { id: string; billNumber: string; total: number; paidAmount: number; balance: number };
+  } | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -156,6 +172,7 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
       ACCEPTED: "bg-blue-500/20 text-blue-300 border border-blue-400/30",
       PREPARING: "bg-orange-500/20 text-orange-300 border border-orange-400/30",
       SERVED: "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30",
+      PAID: "bg-violet-500/20 text-violet-300 border border-violet-400/30",
       CANCELLED: "bg-red-500/20 text-red-300 border border-red-400/30",
     };
     return styles[status as keyof typeof styles] || "bg-white/10 text-zinc-300 border border-white/10";
@@ -170,10 +187,39 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
         return <Loader2 className="h-4 w-4 animate-spin" />;
       case "SERVED":
         return <CheckCircle className="h-4 w-4" />;
+      case "PAID":
+        return <CreditCard className="h-4 w-4" />;
       case "CANCELLED":
         return <XCircle className="h-4 w-4" />;
       default:
         return null;
+    }
+  };
+
+  const handleCheckout = async (orderId: string) => {
+    setUpdating((prev) => new Set(prev).add(orderId));
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/generate-bill`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError((data as any)?.error || "Failed to generate bill");
+        return;
+      }
+      setCheckoutOrder({
+        orderId,
+        bill: data.bill,
+      });
+    } catch (err) {
+      setError("Failed to generate bill");
+    } finally {
+      setUpdating((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
     }
   };
 
@@ -304,7 +350,7 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
                     </button>
                   )}
 
-                  {order.status === "SERVED" && (
+                  {order.status === "PAID" && (
                     <button
                       onClick={() => handleDelete(order.id)}
                       disabled={updating.has(order.id)}
@@ -320,10 +366,82 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
                       )}
                     </button>
                   )}
+
+                  {order.status === "SERVED" && (
+                    <>
+                      <button
+                        onClick={() => handleCheckout(order.id)}
+                        disabled={updating.has(order.id)}
+                        data-testid="checkout-order"
+                        className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {updating.has(order.id) ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="h-4 w-4" />
+                            Checkout
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(order.id)}
+                        disabled={updating.has(order.id)}
+                        className="px-4 py-2 btn-secondary-admin disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {updating.has(order.id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      {checkoutOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Checkout</h2>
+              <button
+                onClick={() => setCheckoutOrder(null)}
+                className="p-2 rounded-lg text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-zinc-400 text-sm">
+                Bill #{checkoutOrder.bill.billNumber} • Balance: ₹
+                {checkoutOrder.bill.balance.toFixed(2)}
+              </p>
+              <CashfreeButton
+                billId={checkoutOrder.bill.id}
+                amount={checkoutOrder.bill.balance}
+                orderId={checkoutOrder.orderId}
+                returnUrl={typeof window !== "undefined" ? `${window.location.origin}/dashboard/orders` : undefined}
+                onSuccess={() => {
+                  setCheckoutOrder(null);
+                  fetchOrders();
+                }}
+                onError={(msg) => setError(msg)}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
