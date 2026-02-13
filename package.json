@@ -16,7 +16,8 @@
     "load:admin": "k6 run load-tests/admin-api.js",
     "load:webhook": "k6 run load-tests/webhook.js",
     "load:stress": "k6 run load-tests/stress-test.js",
-    "log:summary": "node scripts/log-summary.js"
+    "log:summary": "node scripts/log-summary.js",
+    "db:seed": "npx prisma db seed"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
@@ -63,5 +64,8 @@
   "engines": {
     "node": "20.x",
     "npm": "10.x"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
