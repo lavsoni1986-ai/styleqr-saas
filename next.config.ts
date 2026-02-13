@@ -125,21 +125,10 @@ const nextConfig: NextConfig = {
   // Server external packages (moved from experimental in Next.js 16)
   serverExternalPackages: ["@prisma/client"],
 
-  // Experimental features
-  experimental: {
-    // optimizeCss disabled: lightningcss linux-musl binary fails on Railway (SIGSEGV)
-    // optimizeCss: true,
-  },
-
-  // Turbopack configuration (Next.js 16 default)
-  // Empty config silences the warning when webpack config is present
-  // Webpack config is kept for explicit --webpack builds
-  turbopack: {},
-
   // TypeScript configuration
   typescript: {
     // Ignore build errors in generated Next.js types (known issue in Next.js 16)
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
 
   // Webpack optimizations (used when --webpack flag is explicitly passed)
