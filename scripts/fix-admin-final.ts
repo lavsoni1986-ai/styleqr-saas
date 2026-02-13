@@ -1,21 +1,40 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const result = await prisma.user.update({
-    where: { email: "lavsoni1986@gmail.com" },
-    data: {
-      emailVerified: new Date(),
-      password: "$2b$10$Ep7viJ6ieyQjH.Hn/9WkFeU/4tS2nL0z/I6hV0.S7Wp1z7J5k9m2e",
-    },
-  });
+  const email = 'lavsoni1986@gmail.com';
+  const password = 'admin123';
 
-  console.log("Database Fixed & Admin Verified");
-  await prisma.$disconnect();
+  console.log(`🔐 Generating fresh hash for: ${password}`);
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  console.log(`🛠️ Fixing user: ${email}...`);
+
+  try {
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {
+        password: hashedPassword,
+        emailVerified: new Date(),
+        role: 'SUPER_ADMIN'
+      },
+      create: {
+        email,
+        name: 'Lav Kumar Soni',
+        password: hashedPassword,
+        emailVerified: new Date(),
+        role: 'SUPER_ADMIN'
+      }
+    });
+    console.log("✅ Success! User Fixed.");
+    console.log("🆔 User ID:", user.id);
+  } catch (e) {
+    console.error("❌ Error:", e);
+  }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .catch((e) => console.error(e))
+  .finally(async () => await prisma.$disconnect());
