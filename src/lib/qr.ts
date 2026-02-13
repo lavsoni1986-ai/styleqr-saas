@@ -17,11 +17,9 @@ export async function generateQRCode(data: string): Promise<string> {
   }
 }
 
-/** Base URL for QR codes and menu links. Production: NEXT_PUBLIC_BASE_URL (e.g. https://stylerqrestaurant.in). */
+/** Base URL for QR codes and menu links. Set NEXT_PUBLIC_APP_URL in production (e.g. https://stylerqrestaurant.in). */
 const getBaseUrl = () =>
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  "http://localhost:3000";
+  process.env.NEXT_PUBLIC_APP_URL || "https://stylerqrestaurant.in";
 
 export const getRestaurantMenuUrl = (restaurantId: string) => {
   return `${getBaseUrl()}/menu/${restaurantId}`;
