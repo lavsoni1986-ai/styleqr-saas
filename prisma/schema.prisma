@@ -12,6 +12,7 @@ model User {
   email         String       @unique
   name          String?
   password      String?
+  emailVerified DateTime?
   role          Role         @default(RESTAURANT_ADMIN)
   restaurantId  String?
   districtId    String?
