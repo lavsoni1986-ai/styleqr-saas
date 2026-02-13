@@ -62,7 +62,7 @@ export function MobileMenuCard({ item, quantity, onAdd, onRemove, priority }: Mo
           </div>
           <div className="flex-shrink-0">
             <p className="text-xl font-bold text-amber-400 whitespace-nowrap">
-              ${item.price.toFixed(2)}
+              ₹{item.price.toFixed(2)}
             </p>
           </div>
         </div>

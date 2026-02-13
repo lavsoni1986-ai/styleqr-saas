@@ -251,7 +251,7 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-zinc-100">${order.total.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-zinc-100">₹{order.total.toFixed(2)}</p>
                   </div>
                 </div>
 
@@ -262,7 +262,7 @@ export default function OrdersContent({ restaurantId }: OrdersContentProps) {
                         <span className="text-zinc-300">
                           {item.quantity}x {item.menuItem.name}
                         </span>
-                        <span className="text-zinc-400">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="text-zinc-400">₹{(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>

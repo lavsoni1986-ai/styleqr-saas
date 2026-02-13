@@ -72,21 +72,21 @@ export default function PartnerDashboardContent({
     },
     {
       title: "Total Commissions",
-      value: `$${stats.totalCommissions.toFixed(2)}`,
+      value: `₹${stats.totalCommissions.toFixed(2)}`,
       icon: DollarSign,
       color: "bg-emerald-500",
       subtitle: `${stats.totalCommissionCount} records`,
     },
     {
       title: "Paid Commissions",
-      value: `$${stats.paidCommissions.toFixed(2)}`,
+      value: `₹${stats.paidCommissions.toFixed(2)}`,
       icon: TrendingUp,
       color: "bg-green-500",
       subtitle: `${stats.paidCommissionCount} records`,
     },
     {
       title: "Pending Commissions",
-      value: `$${stats.pendingCommissions.toFixed(2)}`,
+      value: `₹${stats.pendingCommissions.toFixed(2)}`,
       icon: Clock,
       color: "bg-amber-500",
       subtitle: `${stats.pendingCommissionCount} records`,
@@ -149,7 +149,7 @@ export default function PartnerDashboardContent({
                     </h3>
                     <p className="text-sm text-slate-600 mt-1">
                       Order: {commission.order?.id.slice(-8) || "N/A"} • 
-                      Order Total: ${commission.order?.total.toFixed(2) || "0.00"}
+                      Order Total: ₹{commission.order?.total.toFixed(2) || "0.00"}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
                       {new Date(commission.createdAt).toLocaleDateString()}
@@ -157,7 +157,7 @@ export default function PartnerDashboardContent({
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-emerald-600">
-                      ${commission.amount.toFixed(2)}
+                      ₹{commission.amount.toFixed(2)}
                     </p>
                     <span
                       className={`inline-block px-2 py-1 rounded text-xs font-semibold mt-1 ${

@@ -46,7 +46,7 @@ export function getRestaurantStructuredData(restaurant: {
     image: restaurant.image || "",
     url: baseUrl,
     servesCuisine: "Various",
-    priceRange: "$$",
+    priceRange: "₹₹",
   };
 }
 

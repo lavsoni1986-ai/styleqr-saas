@@ -310,7 +310,7 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
                       )}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="font-semibold text-amber-400">${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="font-semibold text-amber-400">₹{(item.price * item.quantity).toFixed(2)}</p>
                       <p className="text-xs text-zinc-500">Qty: {item.quantity}</p>
                     </div>
                   </div>
@@ -321,7 +321,7 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
           <div className="mt-4 pt-4 border-t border-white/10">
             <div className="flex items-center justify-between">
               <span className="text-lg font-bold text-zinc-100">Total</span>
-              <span className="text-2xl font-bold text-amber-400">${order.total.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-amber-400">₹{order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>

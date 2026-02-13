@@ -68,10 +68,10 @@ export function CartDrawer({
                     {cartItem.item.name}
                   </h3>
                   <p className="text-sm text-zinc-500 mt-1">
-                    ${cartItem.item.price.toFixed(2)} each
+                    ₹{cartItem.item.price.toFixed(2)} each
                   </p>
                   <p className="text-base font-bold text-amber-400 mt-2">
-                    ${(cartItem.item.price * cartItem.qty).toFixed(2)}
+                    ₹{(cartItem.item.price * cartItem.qty).toFixed(2)}
                   </p>
                 </div>
 
@@ -115,7 +115,7 @@ export function CartDrawer({
           <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur border-t border-white/10 px-5 py-4 safe-area-inset-bottom">
             <div className="flex items-center justify-between mb-4">
               <span className="text-lg font-semibold text-zinc-400">Total</span>
-              <span className="text-3xl font-bold text-amber-400">${total.toFixed(2)}</span>
+              <span className="text-3xl font-bold text-amber-400">₹{total.toFixed(2)}</span>
             </div>
             <button
               data-testid="place-order"

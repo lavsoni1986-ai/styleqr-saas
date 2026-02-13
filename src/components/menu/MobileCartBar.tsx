@@ -50,7 +50,7 @@ export function MobileCartBar({
         <div className="px-4 pb-4 pt-2">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-zinc-400">Total</span>
-            <span className="text-2xl font-bold text-amber-400">${totalPrice.toFixed(2)}</span>
+            <span className="text-2xl font-bold text-amber-400">₹{totalPrice.toFixed(2)}</span>
           </div>
           <button
             data-testid="place-order"

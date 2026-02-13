@@ -76,7 +76,7 @@ export default function CommissionReports({
             <div>
               <p className="text-sm text-slate-600 font-medium">Total Commissions</p>
               <p className="text-2xl font-bold text-slate-900 mt-2">
-                ${totalAmount.toFixed(2)}
+                ₹{totalAmount.toFixed(2)}
               </p>
               <p className="text-xs text-slate-500 mt-1">{commissions.length} records</p>
             </div>
@@ -91,7 +91,7 @@ export default function CommissionReports({
             <div>
               <p className="text-sm text-slate-600 font-medium">Paid Commissions</p>
               <p className="text-2xl font-bold text-green-600 mt-2">
-                ${paidAmount.toFixed(2)}
+                ₹{paidAmount.toFixed(2)}
               </p>
               <p className="text-xs text-slate-500 mt-1">
                 {commissions.filter((c) => c.status === "PAID").length} records
@@ -108,7 +108,7 @@ export default function CommissionReports({
             <div>
               <p className="text-sm text-slate-600 font-medium">Pending Commissions</p>
               <p className="text-2xl font-bold text-amber-600 mt-2">
-                ${pendingAmount.toFixed(2)}
+                ₹{pendingAmount.toFixed(2)}
               </p>
               <p className="text-xs text-slate-500 mt-1">
                 {commissions.filter((c) => c.status === "PENDING" || c.status === "CALCULATED").length} records
@@ -174,13 +174,13 @@ export default function CommissionReports({
                         {commission.order?.id.slice(-8) || "N/A"}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
-                        ${commission.baseAmount.toFixed(2)}
+                        ₹{commission.baseAmount.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {commission.rate}%
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-emerald-600">
-                        ${commission.amount.toFixed(2)}
+                        ₹{commission.amount.toFixed(2)}
                       </td>
                       <td className="px-6 py-4">
                         <span

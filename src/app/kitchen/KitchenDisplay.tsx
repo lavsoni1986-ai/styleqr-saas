@@ -406,7 +406,7 @@ function OrderCard({
             <Clock className="h-4 w-4" />
             <span className="text-sm font-semibold">{formatTimeElapsed(order.timeElapsed)}</span>
           </div>
-          <p className="text-xl font-bold text-white">${order.total.toFixed(2)}</p>
+          <p className="text-xl font-bold text-white">₹{order.total.toFixed(2)}</p>
         </div>
       </div>
 
@@ -441,7 +441,7 @@ function OrderCard({
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-white truncate">{item.name}</p>
-                <p className="text-xs text-slate-400">${item.price.toFixed(2)} each</p>
+                <p className="text-xs text-slate-400">₹{item.price.toFixed(2)} each</p>
               </div>
             </div>
             <div className="flex-shrink-0 ml-3">

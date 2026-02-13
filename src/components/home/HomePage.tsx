@@ -566,7 +566,7 @@ function RevenueAutomationSection() {
           }}
         >
           <p className="mb-2">
-            <span style={{ color: tokens.colors.accent }}>$ </span>
+            <span style={{ color: tokens.colors.accent }}>₹ </span>
             Idempotency Keys
           </p>
           <p className="leading-relaxed">

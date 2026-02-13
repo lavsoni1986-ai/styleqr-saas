@@ -35,7 +35,7 @@ export default async function UpgradePage() {
       {
         type: PlanType.BASIC,
         name: "Basic",
-        price: "$29",
+        price: "₹29",
         period: "month",
         features: [
           "Up to 5 restaurants",
@@ -47,7 +47,7 @@ export default async function UpgradePage() {
       {
         type: PlanType.PRO,
         name: "Pro",
-        price: "$99",
+        price: "₹99",
         period: "month",
         features: [
           "Unlimited restaurants",

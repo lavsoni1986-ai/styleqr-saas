@@ -63,7 +63,7 @@ export default function PlatformDashboardContent({
     },
     {
       title: "Revenue",
-      value: `$${stats.revenue.toFixed(2)}`,
+      value: `₹${stats.revenue.toFixed(2)}`,
       icon: DollarSign,
       color: "bg-emerald-500",
     },

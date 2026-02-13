@@ -268,7 +268,7 @@ export default function MenuContent({ initialCategories, restaurantId }: MenuCon
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-zinc-100 truncate">{item.name}</h3>
                           <p className="text-sm text-zinc-400 mt-1 line-clamp-2">{item.description || "No description"}</p>
-                          <p className="text-lg font-bold text-amber-400 mt-2">${item.price.toFixed(2)}</p>
+                          <p className="text-lg font-bold text-amber-400 mt-2">₹{item.price.toFixed(2)}</p>
                         </div>
                       </div>
                       <div className="flex gap-2 mt-4">
