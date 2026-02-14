@@ -1,6 +1,9 @@
 import "server-only";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+const apiKey = process.env.GEMINI_API_KEY || "";
+const genAI = new GoogleGenerativeAI(apiKey);
+
 export type DailySalesData = {
   restaurantName: string;
   date: string;
@@ -10,43 +13,32 @@ export type DailySalesData = {
   topItems: { name: string; quantity: number }[];
 };
 
-/**
- * Generates a 3-line "Smart Insight" for the restaurant owner using Gemini.
- * Example: "Your Biryani is selling fast, increase stock for tomorrow"
- */
 export async function generateSmartInsight(data: DailySalesData): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return "Add GEMINI_API_KEY to .env to enable AI insights.";
+    console.error("❌ GEMINI_API_KEY is missing in environment variables");
+    return "AI insight unavailable. Please check API Key configuration.";
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Using the latest stable model for 2026
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const topItemsStr =
-      data.topItems.length > 0
-        ? data.topItems.map((i) => `${i.name} (${i.quantity} sold)`).join(", ")
-        : "No items sold today";
-
-    const prompt = `You are a helpful assistant for a restaurant owner. Based on today's sales data, write exactly 3 short, actionable lines of insight or advice. Be specific and practical. Use a friendly, encouraging tone.
-
-Restaurant: ${data.restaurantName}
-Date: ${data.date}
-Total Revenue: ₹${data.totalRevenue.toFixed(2)}
-Orders: ${data.orderCount}
-Payment split: UPI ₹${data.paymentByMethod.UPI?.toFixed(2) ?? 0}, CASH ₹${data.paymentByMethod.CASH?.toFixed(2) ?? 0}
-Top selling items: ${topItemsStr}
-
-Write 3 lines only. No bullet points. Each line should be a complete sentence. Focus on: what's selling well, what to stock up, or any pattern worth noting.`;
-
+    const prompt = `
+  You are a restaurant analytics expert. Analyze this daily sales data for a restaurant owner.
+  Data: ${JSON.stringify(data)}
+  Provide a short, motivating insight (under 40 words) in Hinglish (Hindi+English mix) suitable for a WhatsApp message.
+  Focus on: Top selling item, Total Revenue, and one actionable tip for tomorrow.
+  Do not use bold markdown (*), just plain text with emojis.
+`;
     const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text()?.trim() ?? "";
+    const response = await result.response;
+    return response.text() ?? "Unable to generate insight.";
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("❌ Gemini API Error:", msg);
 
-    return text || "Unable to generate insight.";
-  } catch (error) {
-    console.error("[Gemini] Smart insight error:", error);
-    return "AI insight unavailable. Check GEMINI_API_KEY.";
+    // Fallback if AI fails so the user still sees something useful
+    const totalSales = data.totalRevenue ?? 0;
+    return `🚀 Great job today! You made ₹${totalSales}. Keep pushing for more tomorrow! (AI is taking a quick nap)`;
   }
 }
