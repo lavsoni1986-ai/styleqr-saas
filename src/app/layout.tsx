@@ -92,8 +92,7 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     verification: {
-      // Add Google Search Console verification if needed
-      // google: "verification-code",
+      google: "-Fno4LBYgpKkR6AKXxtbe65nOWxp3VtC1wgmkHD3yVM",
     },
   };
 }
