@@ -35,6 +35,16 @@ export default function PaymentModal({
   const [error, setError] = useState<string | null>(null);
   const touchStartY = useRef<number>(0);
 
+  // Reset to CASH when modal opens (avoids Payment Gateway loading for demo)
+  useEffect(() => {
+    if (isOpen) {
+      setMethod("CASH");
+      setAmount(bill.balance.toFixed(2));
+      setReference("");
+      setNotes("");
+    }
+  }, [isOpen, bill.balance]);
+
   // Esc closes modal
   useEffect(() => {
     if (!isOpen) return;
