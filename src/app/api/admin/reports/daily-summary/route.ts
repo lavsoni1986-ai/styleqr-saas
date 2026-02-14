@@ -109,6 +109,22 @@ export async function GET(request: NextRequest) {
     let formattedMessage: string | null = null;
 
     if (generate) {
+      // Force retry: ignore existing report if smartInsight indicates failure (unavailable/API_KEY)
+      const existingReport = await prisma.dailyReport.findUnique({
+        where: {
+          restaurantId_reportDate: {
+            restaurantId: restaurant.id,
+            reportDate: startDate,
+          },
+        },
+        select: { smartInsight: true },
+      });
+
+      const existingInsightBad =
+        existingReport?.smartInsight &&
+        (existingReport.smartInsight.includes("unavailable") ||
+          existingReport.smartInsight.includes("API_KEY"));
+
       const salesData: DailySalesData = {
         restaurantName: restaurant.name,
         date: reportDate,
@@ -118,7 +134,11 @@ export async function GET(request: NextRequest) {
         topItems,
       };
 
-      smartInsight = await generateSmartInsight(salesData);
+      // Always fetch new insight when existing is bad; otherwise generate fresh when requested
+      smartInsight =
+        existingInsightBad || !existingReport?.smartInsight
+          ? await generateSmartInsight(salesData)
+          : existingReport.smartInsight;
 
       // Format full message (WhatsApp mockup)
       const lines = [
