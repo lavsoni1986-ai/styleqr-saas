@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CreditCard,
   RefreshCcw,
+  Banknote,
 } from "lucide-react";
 import { OrderStatus } from "@prisma/client";
 import CustomerPayButton from "@/components/order/CustomerPayButton";
@@ -57,9 +58,32 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [payError, setPayError] = useState<string | null>(null);
+  const [payAtCounterLoading, setPayAtCounterLoading] = useState(false);
   const servedFetchDone = useRef(false);
 
+  const handlePayAtCounter = useCallback(async () => {
+    if (payAtCounterLoading || !orderId) return;
+    setPayAtCounterLoading(true);
+    setPayError(null);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/pay-at-counter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to place order");
+      }
+      router.replace(`/order/${orderId}?payment=success&payAtCounter=true`);
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : "Failed to place order");
+    } finally {
+      setPayAtCounterLoading(false);
+    }
+  }, [orderId, payAtCounterLoading, router]);
+
   const paymentSuccess = searchParams.get("payment") === "success";
+  const payAtCounter = searchParams.get("payAtCounter") === "true";
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -136,12 +160,12 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
     return () => clearInterval(interval);
   }, [loading, error, order?.status, fetchOrder]);
 
-  // Refetch when returning from payment (payment=success in URL)
+  // Refetch when returning from payment (payment=success or payAtCounter in URL)
   useEffect(() => {
-    if (paymentSuccess && order) {
+    if ((paymentSuccess || payAtCounter) && order) {
       fetchOrder();
     }
-  }, [paymentSuccess, order, fetchOrder]);
+  }, [paymentSuccess, payAtCounter, order, fetchOrder]);
 
   // Update time elapsed every second
   useEffect(() => {
@@ -455,14 +479,32 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
             {payError && (
               <p className="text-sm text-red-400 text-center">{payError}</p>
             )}
+            <button
+              type="button"
+              onClick={handlePayAtCounter}
+              disabled={payAtCounterLoading}
+              className="w-full py-4 bg-emerald-500 text-white font-bold text-lg rounded-xl hover:bg-emerald-400 active:bg-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors touch-manipulation shadow-lg shadow-emerald-900/20"
+            >
+              {payAtCounterLoading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Placing order...
+                </>
+              ) : (
+                <>
+                  <Banknote className="h-5 w-5" />
+                  Pay at Counter / Cash
+                </>
+              )}
+            </button>
             <CustomerPayButton
               orderId={orderId}
               amount={order.bill?.balance ?? order.total}
               onSuccess={() => setPayError(null)}
               onError={(msg) => setPayError(msg)}
-              className="w-full py-4 bg-amber-500 text-zinc-950 font-bold text-lg rounded-xl hover:bg-amber-400 active:bg-amber-300 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-amber-500 text-zinc-950 font-bold rounded-xl hover:bg-amber-400 active:bg-amber-300 flex items-center justify-center gap-2"
             >
-              Pay ₹{(order.bill?.balance ?? order.total).toFixed(2)} Now
+              Pay ₹{(order.bill?.balance ?? order.total).toFixed(2)} Now (Online)
             </CustomerPayButton>
           </div>
         </div>
@@ -472,8 +514,12 @@ export default function OrderTrackingClient({ orderId }: { orderId: string }) {
         <div className="fixed bottom-0 left-0 right-0 bg-violet-500/20 backdrop-blur-xl border-t border-violet-400/30 py-6 px-6 z-20 safe-area-inset-bottom">
           <div className="max-w-md mx-auto flex flex-col items-center justify-center gap-2">
             <CreditCard className="h-8 w-8 text-violet-400" />
-            <p className="font-bold text-zinc-100 text-center text-lg">Payment Successful</p>
-            <p className="text-sm text-zinc-400 text-center">Thank you for dining with us!</p>
+            <p className="font-bold text-zinc-100 text-center text-lg">
+              {payAtCounter ? "Order Placed! Please pay at the counter." : "Payment Successful"}
+            </p>
+            <p className="text-sm text-zinc-400 text-center">
+              {payAtCounter ? "Head to the counter to complete your payment." : "Thank you for dining with us!"}
+            </p>
           </div>
         </div>
       )}
